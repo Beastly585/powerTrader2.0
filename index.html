@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Energy Trader — Dashboard</title>
+  <meta name="description" content="ERCOT energy market forecasting dashboard">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script>
+    // Apply theme before first paint to prevent flash
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('et-theme') || 'dark');
+  </script>
+  <style>
+    /* ── Index-specific ────────────────────────────────── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+      padding-bottom: 80px;
+    }
+    @media(max-width:1100px){ .main-grid{ grid-template-columns:1fr; } }
+
+    .col-left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+    .col-right { display: flex; flex-direction: column; gap: 16px; }
+
+    /* Map */
+    #tx-map {
+      height: 380px;
+      border-radius: var(--r2);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .map-controls {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      margin-bottom: 10px;
+    }
+    .map-controls label {
+      font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-faint);
+    }
+    .map-controls input[type=date] {
+      background: var(--bg1); border: 1px solid var(--border);
+      color: var(--text-hi); font-family: var(--font-mono); font-size: 13px;
+      padding: 5px 10px; border-radius: var(--r); width: auto;
+    }
+    .map-controls input[type=range] {
+      flex: 1; max-width: 180px; accent-color: var(--amber);
+    }
+    .map-hour-label {
+      font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+      color: var(--amber); min-width: 64px;
+    }
+
+    /* Log picker */
+    .day-picker {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg1); border: 1px solid var(--border);
+      border-radius: var(--r2);
+    }
+    .day-picker input[type=date] {
+      flex: 1; background: none; border: none; box-shadow: none; padding: 0;
+      font-family: var(--font-display); font-size: 18px; font-weight: 700;
+      color: var(--text-hi); width: auto;
+    }
+    .day-picker input[type=date]:focus { border: none; box-shadow: none; }
+
+    /* Log sections */
+    .log-section {
+      background: var(--bg1); border: 1px solid var(--border);
+      border-radius: var(--r3); overflow: hidden;
+    }
+    .log-section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 16px;
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+    }
+    .log-section-title {
+      font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-dim); flex: 1;
+    }
+    .log-section-body { padding: 16px; }
+
+    /* Prediction table */
+    .pred-table {
+      width: 100%; border-collapse: collapse;
+      font-family: var(--font-mono); font-size: 12px;
+    }
+    .pred-table th {
+      padding: 7px 10px; text-align: left;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-faint); border-bottom: 1px solid var(--border);
+      white-space: nowrap; background: var(--bg2);
+    }
+    .pred-table td {
+      padding: 9px 10px; border-bottom: 1px solid rgba(37,44,56,0.4);
+      white-space: nowrap;
+    }
+    .pred-table tr:last-child td { border-bottom: none; }
+    .pred-table tr:hover td { background: var(--bg2); }
+    .pred-table .hub-col {
+      display: flex; align-items: center; gap: 7px;
+      font-weight: 500; color: var(--text-hi); font-size: 13px;
+    }
+
+    /* Hour tabs */
+    .hour-tab-strip {
+      display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px;
+    }
+    .hour-tab {
+      padding: 4px 14px; font-family: var(--font-mono); font-size: 11px;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text-dim); border-radius: var(--r); cursor: pointer;
+      transition: var(--t); white-space: nowrap; flex-shrink: 0;
+    }
+    .hour-tab.active { background: rgba(245,166,35,0.12); border-color: var(--amber); color: var(--amber); font-weight: 500; }
+
+    /* Sidebar stats */
+    .acc-hub-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .acc-hub-row:last-child { border-bottom: none; }
+    .acc-hub-name { flex: 1; display: flex; align-items: center; gap: 7px; font-size: 13px; }
+    .acc-pct { font-family: var(--font-mono); font-size: 13px; font-weight: 600; min-width: 44px; text-align: right; }
+
+    /* Recent entries */
+    .recent-entry {
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: var(--t); display: flex; align-items: center; gap: 12px;
+    }
+    .recent-entry:last-child { border-bottom: none; }
+    .recent-entry:hover .recent-entry-title { color: var(--amber); }
+    .recent-entry-date { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); min-width: 72px; }
+    .recent-entry-title { font-size: 13px; color: var(--text-hi); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="index.html">
+    <span>Energy<span class="nav-brand-dot">.</span>Trader</span>
+    <span class="nav-brand-sub">ERCOT</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Dashboard</a></li>
+    <li><a href="review.html">Review</a></li>
+    <li><a href="notes.html">Notes</a></li>
+    <li><a href="admin-lEqo0dka.html">Admin</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+      <span class="theme-toggle-icon" id="theme-icon">☀️</span>
+      <span id="theme-label">Light</span>
+    </button>
+    <div class="nav-live-dot" id="live-dot" title="Live data status"></div>
+    <span class="nav-time" id="nav-clock">--:-- CPT</span>
+  </div>
+</nav>
+
+<!-- Hub ticker strip (NFL-scoreboard style) -->
+<div class="hub-ticker" id="hub-ticker">
+  <!-- populated by JS -->
+  <div class="hub-ticker-meta">
+    <span class="text-xs text-faint mono" id="prices-ts">—</span>
+    <button class="btn btn-ghost btn-sm" onclick="loadLiveData()"
+      style="padding:4px 10px;font-size:10px;letter-spacing:.06em"
+      title="Refresh prices — click after running ercot-sync">↻ Refresh</button>
+  </div>
+</div>
+
+
+<div class="page page--with-ticker">
+<div class="container" style="padding-top:24px">
+<div class="main-grid">
+
+  <!-- ═══════════════════════════════════════════════════════
+       LEFT COLUMN
+  ════════════════════════════════════════════════════════ -->
+  <div class="col-left">
+
+    <!-- Unified date control — drives both map and log -->
+    <div class="day-picker" style="background:var(--bg1)">
+      <span class="text-faint text-xs mono" style="letter-spacing:0.12em;text-transform:uppercase;flex-shrink:0">Date</span>
+      <input type="date" id="map-date" value=""
+        style="flex:1;background:none;border:none;box-shadow:none;padding:0;font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--text-hi)">
+      <button class="btn btn-ghost btn-sm" onclick="shiftMapDate(-1)">‹ Prev</button>
+      <button class="btn btn-ghost btn-sm" onclick="shiftMapDate(1)">Next ›</button>
+      <span class="text-faint text-xs mono" style="flex-shrink:0">Hour</span>
+      <input type="range" id="map-hour-slider" min="0" max="3" value="0"
+        oninput="onMapHourChange()" style="width:120px;accent-color:var(--amber)">
+      <span class="map-hour-label" id="map-hour-label" style="min-width:60px">—</span>
+    </div>
+
+    <!-- Texas Map -->
+    <div class="card" style="margin-top:-1px;border-top-left-radius:0;border-top-right-radius:0">
+      <div style="padding:10px 12px 10px">
+        <div id="tx-map" style="isolation:isolate"></div>
+      </div>
+    </div>
+
+    <!-- Log view — same date as map, no separate date picker -->
+    <div id="log-view" style="display:flex;flex-direction:column;gap:14px">
+      <div class="log-section">
+        <div class="log-section-header"><span class="log-section-title">Select a date above</span></div>
+        <div class="log-section-body" style="color:var(--text-faint);font-size:13px">
+          Choose a date to view day-ahead predictions, weather forecasts, and prior-day comparisons.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col-left -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       RIGHT COLUMN
+  ════════════════════════════════════════════════════════ -->
+  <div class="col-right">
+
+    <!-- Accuracy stats -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Accuracy (30 days)</span>
+        <select id="acc-range" class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px" onchange="loadAccuracy()">
+          <option value="30">30d</option>
+          <option value="90">90d</option>
+          <option value="180">180d</option>
+          <option value="365">All time</option>
+        </select>
+      </div>
+      <div class="card-body" id="acc-body">
+        <div class="skeleton" style="height:60px"></div>
+      </div>
+    </div>
+
+    <!-- Recent entries -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Entries</span>
+        <a href="admin-lEqo0dka.html" class="btn btn-ghost btn-sm">+ New</a>
+      </div>
+      <div class="card-body card-body--flush" style="padding:0 16px">
+        <div id="recent-entries">
+          <div class="skeleton" style="height:14px;margin:14px 0"></div>
+          <div class="skeleton" style="height:14px;margin-bottom:12px"></div>
+          <div class="skeleton" style="height:14px;margin-bottom:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ERCOT CDR quick links -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">ERCOT Live Data Sources</span></div>
+      <div class="card-body">
+        <p class="text-xs text-dim mb-2" style="line-height:1.6">
+          ERCOT CDR tables can't be fetched directly from browsers (no CORS headers).
+          Open them below to read current prices, then enter in Admin.
+        </p>
+        <div class="cdr-links">
+          <a class="cdr-link" href="https://www.ercot.com/content/cdr/html/real_time_spp.html" target="_blank">RT SPP</a>
+          <a class="cdr-link" href="https://www.ercot.com/content/cdr/html/dam_spp.html" target="_blank">DAM SPP</a>
+          <a class="cdr-link" href="https://www.ercot.com/content/cdr/html/as_capacity_monitor.html" target="_blank">AS Cap</a>
+          <a class="cdr-link" href="https://www.ercot.com/gridmktinfo/dashboards/systemwideprices" target="_blank">System Prices</a>
+          <a class="cdr-link" href="https://www.ercot.com/gridmktinfo/dashboards/fuelmix" target="_blank">Fuel Mix</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes preview -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Latest Notes</span>
+        <a href="notes.html" class="btn btn-ghost btn-sm">View all</a>
+      </div>
+      <div class="card-body" id="notes-preview">
+        <div class="skeleton" style="height:14px;margin-bottom:8px"></div>
+        <div class="skeleton" style="height:14px;margin-bottom:8px"></div>
+      </div>
+    </div>
+
+  </div><!-- /col-right -->
+
+</div><!-- /main-grid -->
+</div><!-- /container -->
+</div><!-- /page -->
+
+<footer class="site-footer">© <span id="yr"></span> · Kevin Maresca · Energy Trader Portfolio</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/ui.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+// ── Theme ─────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon)  icon.textContent  = theme === 'light' ? '🌙' : '☀️';
+  if (label) label.textContent = theme === 'light' ? 'Dark' : 'Light';
+  localStorage.setItem('et-theme', theme);
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+// Apply saved theme on load (before paint)
+applyTheme(localStorage.getItem('et-theme') || 'dark');
+
+// ── Clock ─────────────────────────────────────────────────
+function tickClock() {
+  document.getElementById('nav-clock').textContent =
+    new Date().toLocaleTimeString('en-US', { timeZone:'America/Chicago', hour:'2-digit', minute:'2-digit', hour12:true }) + ' CPT';
+}
+tickClock(); setInterval(tickClock, 30000);
+// Auto-refresh prices every 5 minutes
+setInterval(() => { loadLiveData(); }, 5 * 60 * 1000);
+
+// ── App state ─────────────────────────────────────────────
+const today = APP.todayCPT();
+let mapHubMarkers = {};
+let mapLeaflet    = null;
+let currentMapData = null;
+let currentLogDate = today;
+
+// ── INIT ──────────────────────────────────────────────────
+async function init() {
+  document.getElementById('map-date').value = today;
+  updateMapHourLabel();
+  buildHubTicker();
+  initMap();
+  await Promise.all([
+    loadLiveData(),
+    loadLogView(today),
+    loadRecentEntries(),
+    loadAccuracy(),
+    loadNotesPreview(),
+  ]);
+}
+
+// ── Hub ticker strip ──────────────────────────────────────
+function buildHubTicker() {
+  const ticker = document.getElementById('hub-ticker');
+  // Insert hub items before the meta div
+  const meta = ticker.querySelector('.hub-ticker-meta');
+  APP.HUBS.forEach(hub => {
+    const item = document.createElement('div');
+    item.className = 'hub-ticker-item';
+    item.style.setProperty('--hub-color', hub.color);
+    item.title = hub.city;
+    item.innerHTML = `
+      <span class="hub-ticker-name">${hub.label}</span>
+      <span class="hub-ticker-price price--mid" id="htprice-${hub.id}">—</span>
+      <span class="hub-ticker-sub" id="htsub-${hub.id}"></span>
+      <span class="hub-ticker-wx" id="htwx-${hub.id}"></span>`;
+    ticker.insertBefore(item, meta);
+  });
+}
+
+// ── Live data ─────────────────────────────────────────────
+async function loadLiveData() {
+  const dot = document.getElementById('live-dot');
+  dot.style.background = 'var(--amber)';
+
+  const [wxResult, forecastResult] = await Promise.allSettled([
+    Weather.fetchAll(),
+    DB.getForecasts(today),
+  ]);
+
+  const nowHour = parseInt(
+    new Date().toLocaleTimeString('en-US', { timeZone:'America/Chicago', hour:'2-digit', hour12:false })
+  );
+
+  // ── Weather → ticker wx line ──────────────────────────
+  if (wxResult.status === 'fulfilled') {
+    const wx = wxResult.value;
+    window._weatherData = wx;
+    APP.HUBS.forEach(hub => {
+      const d = wx[hub.id];
+      const s = d ? Weather.currentSummary(d) : null;
+      const el = document.getElementById(`htwx-${hub.id}`);
+      if (el && s) el.textContent = `${s.desc.split(' ')[0]} ${s.tempF}°`;
+    });
+    updateMapMarkers();
+  }
+
+  // ── ERCOT prices → ticker price line ─────────────────
+  if (forecastResult.status === 'fulfilled') {
+    const forecasts = forecastResult.value;
+    window._todayForecasts = forecasts;
+
+    const nowHour = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Chicago', hour: 'numeric', hour12: false
+    }) | 0;  // integer 0-23
+
+    APP.HUBS.forEach(hub => {
+      const rows = forecasts.filter(f => f.hub === hub.id);
+      if (!rows.length) return;
+
+      let rtPrice = null, damPrice = null, label = '';
+
+      // Priority 1: rt_hourly JSONB — full curve from sync tool
+      // Find a row for this hub that has rt_hourly populated
+      const rtRow = rows.find(r => r.rt_hourly && Object.keys(r.rt_hourly).length > 0);
+      if (rtRow?.rt_hourly) {
+        const hours = Object.keys(rtRow.rt_hourly).map(Number).filter(h => h >= 1 && h <= 24).sort((a,b) => b - a);
+        // Most recent completed hour at or before now
+        const bestHour = hours.find(h => h <= nowHour) ?? hours[0];
+        if (bestHour != null) {
+          const v = parseFloat(rtRow.rt_hourly[String(bestHour)]);
+          if (!isNaN(v)) { rtPrice = v; label = `HE${bestHour} RT`; }
+        }
+      }
+
+      // Priority 2: actual_energy from a forecast slot (manually entered or from sync)
+      if (rtPrice === null) {
+        // Find the most recent slot with actual data
+        const withActual = rows
+          .filter(r => r.actual_energy !== null && r.actual_energy !== undefined)
+          .sort((a, b) => b.hour_slot - a.hour_slot)[0];
+        if (withActual) {
+          rtPrice = withActual.actual_energy;
+          label = `${APP.fmtHour(withActual.hour_slot)} RT`;
+        }
+      }
+
+      // DAM: any slot with dam_price (prefer the earliest forecast slot)
+      const damRow = rows.filter(r => r.dam_price !== null).sort((a,b) => a.hour_slot - b.hour_slot)[0];
+      if (damRow) damPrice = damRow.dam_price;
+
+      const priceEl = document.getElementById(`htprice-${hub.id}`);
+      const subEl   = document.getElementById(`htsub-${hub.id}`);
+
+      if (priceEl) {
+        if (rtPrice !== null) {
+          priceEl.textContent = APP.fmtPrice(rtPrice);
+          priceEl.className   = `hub-ticker-price price--${APP.priceTier(rtPrice)}`;
+        } else {
+          priceEl.textContent = '—';
+          priceEl.className   = 'hub-ticker-price';
+        }
+      }
+      if (subEl) {
+        const parts = [];
+        if (label)              parts.push(label);
+        if (damPrice !== null)  parts.push(`DAM ${APP.fmtPrice(damPrice)}`);
+        subEl.textContent = parts.join(' · ');
+      }
+    });
+  }
+
+  const ts  = new Date().toLocaleTimeString('en-US', { timeZone:'America/Chicago', hour:'2-digit', minute:'2-digit' });
+  const src = forecastResult.status === 'fulfilled' && forecastResult.value?.length ? 'ERCOT+Wx' : 'Wx only';
+  document.getElementById('prices-ts').textContent = `${src} · ${ts} CPT`;
+  dot.style.background = 'var(--green)';
+  dot.style.boxShadow  = '0 0 6px var(--green)';
+}
+
+// ── Texas Map ─────────────────────────────────────────────
+function initMap() {
+  mapLeaflet = L.map('tx-map', { center: [31.5, -99.5], zoom: 6, zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 12,
+  }).addTo(mapLeaflet);
+
+  APP.HUBS.forEach(hub => {
+    const icon = L.divIcon({
+      html: `<div class="map-marker-pin" id="mpin-${hub.id}" style="--hub-color:${hub.color}">
+        <span class="mp-label">${hub.label}</span>
+        <div class="mp-both">
+          <span class="mp-forecast price--mid" id="mpforecast-${hub.id}">—</span>
+          <span class="mp-actual-val" id="mpactual-${hub.id}"></span>
+        </div>
+      </div>`,
+      className: '', iconAnchor: [44, 20],
+    });
+    mapHubMarkers[hub.id] = L.marker([hub.lat, hub.lon], { icon }).addTo(mapLeaflet);
+    mapHubMarkers[hub.id].bindPopup(() => makePopupContent(hub.id));
+  });
+}
+
+function makePopupContent(hubId) {
+  const hub  = APP.hubById(hubId);
+  const data = (currentMapData || {})[hubId] || {};
+  const wx   = window._weatherData?.[hubId];
+  const wxS  = wx ? Weather.currentSummary(wx) : null;
+  const slot = APP.HOUR_SLOTS[parseInt(document.getElementById('map-hour-slider').value)];
+  const date = document.getElementById('map-date').value;
+
+  // Total forecast = energy + congestion
+  const totalForecast = (data.pred_energy != null && data.pred_congestion != null)
+    ? data.pred_energy + data.pred_congestion
+    : data.pred_energy ?? null;
+  const actual = data.actual_energy ?? null;
+
+  let html = `<div>
+    <div style="font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--text-hi);margin-bottom:4px">
+      ${hub.label} <span style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono)">${hub.city}</span>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-bottom:8px">${APP.fmtDateMed(date)} · ${APP.fmtHour(slot)}</div>`;
+
+  if (data.dam_price != null) {
+    html += `<div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:3px">
+      <span style="color:var(--blue);font-size:11px">DAM</span>
+      <span style="font-family:var(--font-mono);color:var(--blue)">${APP.fmtPrice(data.dam_price)}</span>
+    </div>`;
+  }
+  if (data.pred_energy != null) {
+    html += `<div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:2px">
+      <span style="color:var(--amber);font-size:11px">Energy forecast</span>
+      <span style="font-family:var(--font-mono);color:var(--amber)">${APP.fmtPrice(data.pred_energy)}</span>
+    </div>`;
+  }
+  if (data.pred_congestion != null) {
+    html += `<div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:2px">
+      <span style="color:var(--purple);font-size:11px">+ Congestion</span>
+      <span style="font-family:var(--font-mono);color:var(--purple)">${APP.fmtPrice(data.pred_congestion)}</span>
+    </div>`;
+  }
+  if (totalForecast != null) {
+    html += `<div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:3px;border-top:1px solid var(--border);padding-top:3px;margin-top:2px">
+      <span style="color:var(--amber);font-size:11px;font-weight:500">Total forecast</span>
+      <span style="font-family:var(--font-mono);color:var(--amber);font-weight:500">${APP.fmtPrice(totalForecast)}</span>
+    </div>`;
+  }
+  if (actual != null) {
+    html += `<div style="display:flex;justify-content:space-between;gap:20px;margin-bottom:3px">
+      <span style="color:var(--green);font-size:11px">Actual RT SPP</span>
+      <span style="font-family:var(--font-mono);color:var(--green);font-weight:500">${APP.fmtPrice(actual)}</span>
+    </div>`;
+    if (totalForecast != null) {
+      html += `<div style="display:flex;justify-content:space-between;gap:20px">
+        <span style="color:var(--text-faint);font-size:11px">Accuracy</span>
+        ${UI.accuracyBadge(totalForecast, actual)}
+      </div>`;
+    }
+  }
+  if (wxS) html += `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:6px">${UI.wxChip(wxS)}</div>`;
+  if (data.pred_notes) html += `<div style="margin-top:8px;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:6px">${UI.escapeHtml(data.pred_notes)}</div>`;
+
+  html += '</div>';
+  return html;
+}
+
+// Map date shift buttons
+function shiftMapDate(delta) {
+  const el = document.getElementById('map-date');
+  const d  = new Date((el.value || today) + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  el.value = d.toISOString().slice(0,10);
+  loadMapData(el.value);
+  loadLogView(el.value);
+}
+
+function onMapHourChange() {
+  updateMapHourLabel();
+  const date = document.getElementById('map-date').value;
+  if (date) loadMapData(date);
+}
+
+function updateMapHourLabel() {
+  const idx  = parseInt(document.getElementById('map-hour-slider').value);
+  const slot = APP.HOUR_SLOTS[idx] ?? APP.HOUR_SLOTS[0];
+  document.getElementById('map-hour-label').textContent = APP.fmtHour(slot);
+}
+
+async function loadMapData(date) {
+  if (!date) return;
+  try {
+    const forecasts = await DB.getForecasts(date);
+    const sliderIdx = parseInt(document.getElementById('map-hour-slider').value);
+    const slot = APP.HOUR_SLOTS[sliderIdx];
+    currentMapData = {};
+    forecasts.filter(f => f.hour_slot === slot).forEach(f => { currentMapData[f.hub] = f; });
+    updateMapMarkers();
+  } catch(e) { console.warn('Map data load failed', e); }
+}
+
+document.getElementById('map-date').addEventListener('change', e => {
+  loadMapData(e.target.value);
+  loadLogView(e.target.value);
+});
+
+function updateMapMarkers() {
+  APP.HUBS.forEach(hub => {
+    const data      = (currentMapData || {})[hub.id];
+    const forecastEl = document.getElementById(`mpforecast-${hub.id}`);
+    const actualEl   = document.getElementById(`mpactual-${hub.id}`);
+    if (!forecastEl) return;
+
+    // Total forecast = energy + congestion
+    const totalFc = (data?.pred_energy != null && data?.pred_congestion != null)
+      ? data.pred_energy + data.pred_congestion
+      : (data?.pred_energy ?? null);
+    const actual   = data?.actual_energy ?? null;
+
+    // Forecast value
+    if (totalFc != null) {
+      forecastEl.textContent = APP.fmtPrice(totalFc);
+      forecastEl.className   = `mp-forecast price--${APP.priceTier(totalFc)}`;
+    } else {
+      forecastEl.textContent = '—';
+      forecastEl.className   = 'mp-forecast';
+    }
+
+    // Actual value (green below, or dash)
+    if (actualEl) {
+      if (actual != null) {
+        const tier = APP.priceTier(actual);
+        const colors = { neg:'#60a5fa', low:'#34d399', mid:'#fbbf24', high:'#f87171', spike:'#e879f9' };
+        actualEl.textContent  = APP.fmtPrice(actual);
+        actualEl.style.color  = colors[tier] ?? '#34d399';
+      } else {
+        actualEl.textContent = '—';
+        actualEl.style.color = '';
+      }
+    }
+
+    // Update popup
+    if (mapHubMarkers[hub.id]) {
+      mapHubMarkers[hub.id].setPopupContent(makePopupContent(hub.id));
+    }
+  });
+}
+
+
+// ── Log view ──────────────────────────────────────────────
+// shiftLogDate replaced by shiftMapDate
+
+async function loadLogView(date) {
+  if (!date) return;
+  currentLogDate = date;
+
+  const container = document.getElementById('log-view');
+  container.innerHTML = '<div class="log-section"><div class="log-section-body"><div class="skeleton" style="height:120px"></div></div></div>';
+
+  try {
+    const [entry, forecasts] = await Promise.all([
+      DB.getEntry(date),
+      DB.getForecasts(date),
+    ]);
+
+    container.innerHTML = '';
+
+    if (!entry && !forecasts.length) {
+      container.innerHTML = `<div class="log-section">
+        <div class="log-section-header"><span class="log-section-title">${APP.fmtDateLong(date)}</span></div>
+        <div class="log-section-body" style="color:var(--text-faint);font-size:13px;text-align:center;padding:32px">
+          No data for this date. <a href="admin-lEqo0dka.html" class="text-amber">Add an entry →</a>
+        </div>
+      </div>`;
+      return;
+    }
+
+    // ── Section 1: Day-Ahead Predictions ──────────────────
+    const predSection = buildPredSection(date, entry, forecasts);
+    container.appendChild(predSection);
+
+    // ── Section 2: Prior day comparison ───────────────────
+    const compareSection = buildCompareSection(date, entry, forecasts);
+    container.appendChild(compareSection);
+
+    // ── Section 3: Full 24-hour ERCOT curve ───────────────
+    const curveSection = buildHourlyCurveSection(entry, forecasts);
+    if (curveSection) container.appendChild(curveSection);
+
+    // ── Section 4: News / notes ───────────────────────────
+    if (entry?.news_items?.length || entry?.system_notes) {
+      container.appendChild(buildNewsSection(entry));
+    }
+
+  } catch(e) {
+    container.innerHTML = `<div class="log-section"><div class="log-section-body" style="color:var(--red)">Error: ${UI.escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+
+// ── helpers ───────────────────────────────────────────────
+
+// Parse rt_prices / dam_prices JSONB (may come as object or string)
+function parsePriceJson(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
+// Get price for a slot from the JSONB field (keys stored as string)
+function slotPrice(jsonField, slot) {
+  if (!jsonField) return null;
+  const obj = parsePriceJson(jsonField);
+  if (!obj || typeof obj !== 'object') return null;
+  // rt_hourly keys are HE integers (7, 12, 17, 22)
+  // hour_slot values are full integers (700, 1200, 1700, 2200)
+  // Try the raw key first, then the /100 converted HE key
+  const he = String(Math.floor(slot / 100));
+  return obj[String(slot)] ?? obj[slot] ?? obj[he] ?? null;
+}
+
+// ── DAM price summary row (shown above the full table) ─────
+function buildDamSummary(forecasts) {
+  // All forecasts for this date grouped by slot — show DAM prices in a compact row
+  const bySlot = {};
+  for (const slot of APP.HOUR_SLOTS) {
+    bySlot[slot] = {};
+    for (const hub of APP.HUBS) {
+      const row = forecasts.find(f => f.hub === hub.id && f.hour_slot === slot);
+      // dam_price is the scalar column (manually entered OR from sync tool)
+      // dam_prices JSONB has all slots in one row — but we use dam_price per slot row
+      bySlot[slot][hub.id] = row?.dam_price ?? null;
+    }
+  }
+  return bySlot;
+}
+
+// ── buildPredSection ───────────────────────────────────────
+// Shows three layers per hub × slot:
+//   1. DAM price (auto from sync tool or manually entered)
+//   2. Your RT forecast
+//   3. Actual RT SPP (from sync tool or manual)
+// Plus weather and your notes.
+
+function buildPredSection(date, entry, forecasts) {
+  const el = document.createElement('div');
+  el.className = 'log-section';
+
+  const tags = (entry?.tags || []).map(t => UI.tagPill(t)).join(' ');
+  const syncInfo = entry?.dam_synced_at || entry?.rt_synced_at;
+  const syncBadge = syncInfo
+    ? `<span class="badge badge-dim" title="Last synced">⚡ synced ${new Date(entry.dam_synced_at || entry.rt_synced_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span>`
+    : '';
+
+  el.innerHTML = `
+    <div class="log-section-header">
+      <span class="badge badge-amber">Day-Ahead</span>
+      <span class="log-section-title">${APP.fmtDateLong(date)}</span>
+      <div style="display:flex;align-items:center;gap:6px">${tags}${syncBadge}</div>
+    </div>
+    <div class="log-section-body">
+      ${(entry?.morning_thesis) ? `
+        <div style="border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:16px;background:rgba(245,166,35,0.05);border-radius:0 var(--r2) var(--r2) 0">
+          <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.16em;color:var(--amber);margin-bottom:5px">☀️ Morning Thesis</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.65;white-space:pre-wrap">${UI.escapeHtml(entry.morning_thesis)}</div>
+        </div>` : ''}
+      ${(entry?.system_notes) ? `
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;padding:0 2px">${UI.escapeHtml(entry.system_notes)}</div>` : ''}
+      <div class="hour-tab-strip" id="pred-hour-tabs-${date.replace(/-/g,'')}"></div>
+      <div id="pred-table-wrap-${date.replace(/-/g,'')}"></div>
+    </div>`;
+
+  setTimeout(() => {
+    const tabStrip = el.querySelector(`#pred-hour-tabs-${date.replace(/-/g,'')}`);
+    const tableWrap = el.querySelector(`#pred-table-wrap-${date.replace(/-/g,'')}`);
+    let activeSlot = APP.HOUR_SLOTS[0];
+
+    function renderPredTable(slot) {
+      const rows = forecasts.filter(f => f.hour_slot === slot);
+
+      if (!rows.length) {
+        tableWrap.innerHTML = `<p style="color:var(--text-faint);font-size:13px;padding:8px 0">
+          No predictions for ${APP.fmtHour(slot)}. 
+          <a href="admin-lEqo0dka.html" class="text-amber">Add in Admin →</a>
+        </p>`;
+        return;
+      }
+
+      // Check what data we actually have
+      const hasDam     = rows.some(r => r.dam_price !== null);
+      const hasForecast = rows.some(r => r.pred_energy !== null);
+      const hasActual  = rows.some(r => r.actual_energy !== null);
+      const hasRtJson  = rows.some(r => r.rt_hourly && Object.keys(parsePriceJson(r.rt_hourly)).length > 0);
+
+      // Legend row
+      let legend = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">`;
+      if (hasDam)      legend += `<span class="text-xs mono" style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--blue);display:inline-block"></span> DAM (ERCOT)</span>`;
+      if (hasForecast) legend += `<span class="text-xs mono" style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--amber);display:inline-block"></span> My Forecast</span>`;
+      if (hasActual || hasRtJson) legend += `<span class="text-xs mono" style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);display:inline-block"></span> Actual RT SPP</span>`;
+      legend += `</div>`;
+
+      let html = legend + `<div class="overflow-x"><table class="pred-table">
+        <thead><tr>
+          <th>Hub</th>
+          <th style="color:var(--blue)">DAM $/MWh</th>
+          <th style="color:var(--amber)">My Forecast</th>
+          <th style="color:var(--amber)">+ Congestion</th>
+          <th style="color:var(--green)">Actual RT</th>
+          <th>vs DAM</th>
+          <th>Accuracy</th>
+          <th>Weather</th>
+        </tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        const hub = APP.hubById(r.hub);
+        const wx  = r.wx_temp_f != null
+          ? { tempF: r.wx_temp_f, desc: r.wx_condition || '—', windMph: r.wx_wind_mph, windDir: r.wx_wind_dir }
+          : null;
+
+        // Actual: prefer manual actual_energy, fall back to rt_prices JSONB
+        const rtFromJson = slotPrice(r.rt_hourly, slot);
+        const actualVal  = r.actual_energy ?? rtFromJson;
+
+        // vs DAM delta (actual vs DAM)
+        const vsDam = (actualVal !== null && r.dam_price !== null)
+          ? (actualVal - r.dam_price)
+          : null;
+        const vsDamEl = vsDam !== null
+          ? `<span class="delta delta--${vsDam > 0 ? 'pos' : vsDam < 0 ? 'neg' : 'zero'}">${vsDam > 0 ? '+' : ''}${vsDam.toFixed(2)}</span>`
+          : '<span class="text-faint">—</span>';
+
+        html += `<tr>
+          <td><div class="hub-col">${UI.hubDot(r.hub)}<span>${hub?.label ?? r.hub}</span></div></td>
+          <td class="num" style="color:var(--blue)">${UI.priceBadge(r.dam_price)}</td>
+          <td class="num" style="color:var(--amber)">${UI.priceBadge(r.pred_energy)}</td>
+          <td class="num">${UI.priceBadge(r.pred_congestion)}</td>
+          <td class="num" style="color:var(--green)">${actualVal !== null
+            ? UI.priceBadge(actualVal)
+            : '<span class="text-faint">pending</span>'}</td>
+          <td class="num">${vsDamEl}</td>
+          <td>${actualVal !== null && r.pred_energy !== null
+            ? UI.accuracyBadge(r.pred_energy, actualVal)
+            : '<span class="acc-badge acc-badge--na">—</span>'}</td>
+          <td>${UI.wxChip(wx)}</td>
+        </tr>`;
+
+        if (r.pred_notes) {
+          html += `<tr><td colspan="8" style="color:var(--text-dim);font-size:12px;padding:2px 10px 10px;border-bottom:1px solid var(--border)">↳ ${UI.escapeHtml(r.pred_notes)}</td></tr>`;
+        }
+        if (r.review_notes) {
+          html += `<tr><td colspan="8" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>`;
+        }
+      });
+
+      html += '</tbody></table></div>';
+      tableWrap.innerHTML = html;
+    }
+
+    tabStrip.innerHTML = APP.HOUR_SLOTS.map(s =>
+      `<div class="hour-tab ${s === activeSlot ? 'active' : ''}" data-slot="${s}"
+        onclick="this.parentElement.querySelectorAll('.hour-tab').forEach(t=>t.classList.remove('active'));
+                 this.classList.add('active');
+                 window.__rpt_${date.replace(/-/g,'')}(${s})">
+        ${APP.fmtHour(s)}
+      </div>`
+    ).join('');
+
+    window[`__rpt_${date.replace(/-/g,'')}`] = renderPredTable;
+    renderPredTable(activeSlot);
+  }, 0);
+
+  return el;
+}
+
+// ── buildCompareSection ────────────────────────────────────
+// Side-by-side DAM vs Forecast vs Actual with deltas and accuracy.
+// Only shows if actuals are present (from sync tool or manual).
+
+function buildCompareSection(date, entry, forecasts) {
+  const el = document.createElement('div');
+  el.className = 'log-section';
+
+  // Use actual_energy OR rt_prices JSONB as the "actual"
+  const graded = forecasts.filter(f => {
+    const rtJson = slotPrice(f.rt_hourly, f.hour_slot);
+    return (f.actual_energy !== null) || (rtJson !== null);
+  });
+  const hasActuals = graded.length > 0;
+
+  let dayAcc = null;
+  if (hasActuals) {
+    const accs = graded.map(f => {
+      const actual = f.actual_energy ?? slotPrice(f.rt_hourly, f.hour_slot);
+      return APP.accuracy(f.pred_energy, actual);
+    }).filter(a => a !== null);
+    if (accs.length) dayAcc = Math.round(accs.reduce((a,b)=>a+b,0)/accs.length);
+  }
+
+  const accBadge = dayAcc !== null
+    ? `<span class="acc-badge acc-badge--${dayAcc>=90?'great':dayAcc>=75?'good':dayAcc>=55?'ok':'poor'}">${dayAcc}%</span>`
+    : '';
+
+  el.innerHTML = `
+    <div class="log-section-header">
+      <span class="badge badge-${hasActuals?'green':'dim'}">Settlement Review</span>
+      <span class="log-section-title">DAM · Forecast · Actual RT SPP</span>
+      ${accBadge}
+      ${entry?.rt_synced_at ? `<span class="text-xs text-faint mono">RT synced ${new Date(entry.rt_synced_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
+    </div>
+    <div class="log-section-body">
+      ${entry?.evening_review ? `
+        <div style="border-left:3px solid var(--green);padding:10px 14px;margin-bottom:16px;background:rgba(52,211,153,0.05);border-radius:0 var(--r2) var(--r2) 0">
+          <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.16em;color:var(--green);margin-bottom:5px">🌙 Evening Review</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.65;white-space:pre-wrap">${UI.escapeHtml(entry.evening_review)}</div>
+        </div>` : ''}
+      ${!hasActuals
+        ? `<p style="color:var(--text-faint);font-size:13px">
+            No RT actuals yet. Run <code style="color:var(--amber);font-family:var(--font-mono);font-size:12px">node sync.js &lt;RT_URL&gt;</code> or enter manually in Admin.
+           </p>`
+        : buildCompareTable(graded)
+      }
+    </div>`;
+
+  return el;
+}
+
+function buildCompareTable(forecasts) {
+  let html = '';
+  for (const slot of APP.HOUR_SLOTS) {
+    const rows = forecasts.filter(f => f.hour_slot === slot);
+    if (!rows.length) continue;
+
+    html += `<div class="divider-label"><span>${APP.fmtHour(slot)}</span></div>
+      <div class="overflow-x"><table class="pred-table">
+        <thead><tr>
+          <th>Hub</th>
+          <th style="color:var(--blue)">DAM</th>
+          <th style="color:var(--amber)">Forecast</th>
+          <th style="color:var(--green)">Actual RT</th>
+          <th>Δ RT–DAM</th>
+          <th>Δ RT–Forecast</th>
+          <th>Acc.</th>
+        </tr></thead><tbody>`;
+
+    rows.forEach(r => {
+      const actual = r.actual_energy ?? slotPrice(r.rt_hourly, r.hour_slot);
+      const vsDAM  = (actual !== null && r.dam_price !== null)
+        ? actual - r.dam_price : null;
+      const vsFc   = (actual !== null && r.pred_energy !== null)
+        ? actual - r.pred_energy : null;
+
+      const dEl = (v, invert = false) => {
+        if (v === null) return '<span class="text-faint">—</span>';
+        const pos = invert ? v < 0 : v > 0;
+        const cls = v === 0 ? 'zero' : pos ? 'pos' : 'neg';
+        return `<span class="delta delta--${cls}">${v > 0 ? '+' : ''}${v.toFixed(2)}</span>`;
+      };
+
+      html += `<tr>
+        <td><div class="hub-col">${UI.hubDot(r.hub)} ${APP.hubById(r.hub)?.label ?? r.hub}</div></td>
+        <td class="num" style="color:var(--blue)">${UI.priceBadge(r.dam_price)}</td>
+        <td class="num" style="color:var(--amber)">${UI.priceBadge(r.pred_energy)}</td>
+        <td class="num" style="color:var(--green)">${actual !== null ? UI.priceBadge(actual) : '<span class="text-faint">pending</span>'}</td>
+        <td class="num">${dEl(vsDAM)}</td>
+        <td class="num">${dEl(vsFc)}</td>
+        <td>${actual !== null && r.pred_energy !== null ? UI.accuracyBadge(r.pred_energy, actual) : '<span class="acc-badge acc-badge--na">—</span>'}</td>
+      </tr>
+      ${r.review_notes ? `<tr><td colspan="7" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>` : ''}`;
+    });
+
+    html += '</tbody></table></div>';
+  }
+  return html;
+}
+
+// ── buildHourlyCurveSection ────────────────────────────────
+// Full 24-hour DAM and RT SPP table per hub.
+// Only rendered when rt_hourly or dam_hourly JSONB is present (from sync tool).
+
+function buildHourlyCurveSection(entry, forecasts) {
+  const hasRtHourly  = forecasts.some(f => f.rt_hourly  && Object.keys(f.rt_hourly  || {}).length > 0);
+  const hasDamHourly = forecasts.some(f => f.dam_hourly && Object.keys(f.dam_hourly || {}).length > 0);
+  if (!hasRtHourly && !hasDamHourly) return null;
+
+  const el = document.createElement('div');
+  el.className = 'log-section';
+  const hours = Array.from({length: 24}, (_, i) => i + 1); // HE1..HE24
+
+  let tableHtml = `<div class="overflow-x"><table class="pred-table">
+    <thead>
+      <tr>
+        <th>HE</th>
+        ${APP.HUBS.map(h => `
+          <th colspan="${(hasDamHourly ? 1 : 0) + (hasRtHourly ? 1 : 0)}" style="text-align:center;border-left:1px solid var(--border)">
+            <span style="display:flex;align-items:center;gap:5px;justify-content:center">${UI.hubDot(h.id)} ${h.label}</span>
+          </th>`).join('')}
+      </tr>
+      <tr>
+        <th></th>
+        ${APP.HUBS.map(() => `
+          ${hasDamHourly ? '<th style="color:var(--blue);font-size:9px;border-left:1px solid var(--border)">DAM</th>' : ''}
+          ${hasRtHourly  ? '<th style="color:var(--green);font-size:9px">RT SPP</th>' : ''}`
+        ).join('')}
+      </tr>
+    </thead><tbody>`;
+
+  hours.forEach(he => {
+    const isFcSlot = APP.HOUR_SLOTS.map(s => Math.floor(s / 100)).includes(he);
+    tableHtml += `<tr style="${isFcSlot ? 'background:rgba(245,166,35,0.06)' : ''}">
+      <td class="mono" style="font-size:11px;color:${isFcSlot ? 'var(--amber)' : 'var(--text-faint)'}">
+        ${String(he).padStart(2,'0')}${isFcSlot ? ' ★' : ''}
+      </td>`;
+
+    APP.HUBS.forEach(hub => {
+      const row = forecasts.find(f => f.hub === hub.id);
+      const dam = hasDamHourly ? (row?.dam_hourly?.[String(he)] ?? null) : null;
+      const rt  = hasRtHourly  ? (row?.rt_hourly?.[String(he)]  ?? null) : null;
+
+      if (hasDamHourly) {
+        tableHtml += `<td class="num" style="border-left:1px solid var(--border);color:var(--blue)">${dam !== null ? APP.fmtPrice(dam) : '<span style=\"color:var(--text-faint)\">—</span>'}</td>`;
+      }
+      if (hasRtHourly) {
+        const tier  = rt !== null ? APP.priceTier(rt) : '';
+        tableHtml += `<td class="num"><span class="price price--${tier}">${rt !== null ? APP.fmtPrice(rt) : '—'}</span></td>`;
+      }
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table></div>';
+
+  const syncTs = entry?.rt_synced_at || forecasts.find(f => f.rt_synced_at)?.rt_synced_at;
+  const syncLabel = syncTs
+    ? `<span class="badge badge-dim">⚡ synced ${new Date(syncTs).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span>`
+    : '<span class="badge badge-dim">Run ercot-sync to populate</span>';
+
+  el.innerHTML = `
+    <div class="log-section-header">
+      <span class="badge badge-green">Full Curve</span>
+      <span class="log-section-title">All 24 Hours — DAM &amp; RT SPP</span>
+      ${syncLabel}
+      <span class="text-xs text-faint mono" style="margin-left:auto">★ = your forecast slot</span>
+    </div>
+    <div class="log-section-body">${tableHtml}</div>`;
+
+  return el;
+}
+
+function buildNewsSection(entry) {
+  const el = document.createElement('div');
+  el.className = 'log-section';
+  const items = entry.news_items || [];
+  el.innerHTML = `
+    <div class="log-section-header">
+      <span class="badge badge-blue">News & Notes</span>
+      <span class="log-section-title">Market Context</span>
+    </div>
+    <div class="log-section-body">
+      ${items.map(n => `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-weight:500;color:var(--text-hi);font-size:13px">${UI.escapeHtml(n.headline)}</div>
+        ${n.source ? `<div style="font-size:11px;color:var(--text-dim);margin-top:3px">${UI.escapeHtml(n.source)}</div>` : ''}
+        ${n.url ? `<a href="${UI.escapeHtml(n.url)}" target="_blank" class="text-amber" style="font-size:11px">Read →</a>` : ''}
+      </div>`).join('')}
+      ${entry.system_notes && items.length === 0 ? `<p style="font-size:13px;line-height:1.65">${UI.escapeHtml(entry.system_notes)}</p>` : ''}
+    </div>`;
+  return el;
+}
+
+// ── Recent entries ────────────────────────────────────────
+async function loadRecentEntries() {
+  try {
+    const entries = await DB.listEntries({ limit: 8 });
+    const container = document.getElementById('recent-entries');
+    if (!entries.length) {
+      container.innerHTML = '<p class="text-faint text-sm py-2">No entries yet.</p>';
+      return;
+    }
+    container.innerHTML = entries.map(e => `
+      <div class="recent-entry" onclick="document.getElementById('map-date').value='${e.entry_date}';loadMapData('${e.entry_date}');loadLogView('${e.entry_date}');window.scrollTo({top:0,behavior:'smooth'})">,
+        <span class="recent-entry-date">${APP.fmtDateShort(e.entry_date)}</span>
+        <span class="recent-entry-title">${UI.escapeHtml(e.title || 'Untitled')}</span>
+      </div>`).join('');
+  } catch(e) { document.getElementById('recent-entries').innerHTML = `<p class="text-red text-sm">Error: ${UI.escapeHtml(e.message)}</p>`; }
+}
+
+// ── Accuracy stats ────────────────────────────────────────
+async function loadAccuracy() {
+  const days = parseInt(document.getElementById('acc-range').value);
+  const container = document.getElementById('acc-body');
+  container.innerHTML = UI.skeleton(3, '14px');
+  try {
+    const stats = await DB.getAccuracyStats({ days });
+    if (stats.overall === null) {
+      container.innerHTML = `<p class="text-faint text-sm">Not enough graded data yet.</p>
+        <p class="text-xs text-faint mt-1">Enter actuals in Admin to build your accuracy history.</p>`;
+      return;
+    }
+    const cls = stats.overall >= 90 ? 'great' : stats.overall >= 75 ? 'good' : stats.overall >= 55 ? 'ok' : 'poor';
+    let html = `
+      <div class="flex items-center justify-between mb-3">
+        <div class="stat-block">
+          <div class="stat-block-val">${stats.overall}%</div>
+          <div class="stat-block-label">Overall Accuracy</div>
+          <div class="stat-block-sub">${stats.sampleSize} data points</div>
+        </div>
+        <div class="prog-bar" style="flex:1;margin-left:16px">
+          <div class="prog-bar-fill prog-bar-fill--${cls}" style="width:${stats.overall}%"></div>
+        </div>
+      </div>`;
+    html += APP.HUBS.map(hub => {
+      const acc = stats.byHub[hub.id];
+      if (acc === undefined) return '';
+      const hcls = acc >= 90 ? 'great' : acc >= 75 ? 'good' : acc >= 55 ? 'ok' : 'poor';
+      return `<div class="acc-hub-row">
+        <div class="acc-hub-name">${UI.hubDot(hub.id)} ${hub.label}</div>
+        <div class="prog-bar" style="flex:1;height:4px">
+          <div class="prog-bar-fill prog-bar-fill--${hcls}" style="width:${acc}%"></div>
+        </div>
+        <div class="acc-pct">${acc}%</div>
+      </div>`;
+    }).join('');
+    container.innerHTML = html;
+  } catch(e) { container.innerHTML = `<p class="text-red text-sm">Error loading stats</p>`; }
+}
+
+// ── Notes preview ─────────────────────────────────────────
+async function loadNotesPreview() {
+  try {
+    const notes = await DB.listNotes('note');
+    const el = document.getElementById('notes-preview');
+    if (!notes.length) { el.innerHTML = '<p class="text-faint text-sm">No notes yet.</p>'; return; }
+    el.innerHTML = notes.slice(0,3).map(n => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-weight:500;font-size:13px;color:var(--text-hi)">${UI.escapeHtml(n.title)}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${new Date(n.created_at).toLocaleDateString()}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── Boot ──────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

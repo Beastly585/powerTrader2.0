@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review — Energy Trader</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('et-theme')||'dark');</script>
+  <style>
+    .review-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      padding: 24px 0 80px;
+      align-items: start;
+    }
+    @media(max-width:1100px){ .review-layout { grid-template-columns: 1fr; } }
+
+    /* Hub accuracy cards */
+    .hub-acc-card {
+      background: var(--bg1); border: 1px solid var(--border);
+      border-radius: var(--r3); padding: 14px;
+      position: relative; overflow: hidden;
+    }
+    .hub-acc-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background: var(--hub-color, var(--amber));
+    }
+    .hub-acc-main { font-family: var(--font-mono); font-size: 28px; font-weight: 500; line-height: 1; }
+    .hub-acc-sub  { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+    .hub-acc-cong { font-family: var(--font-mono); font-size: 11px; color: var(--purple); margin-top: 4px; }
+    .hub-acc-mae  { font-family: var(--font-mono); font-size: 11px; color: var(--amber); margin-top: 2px; }
+    .hub-acc-label{ font-family: var(--font-mono); font-size: 10px; text-transform:uppercase; letter-spacing:.14em; color:var(--text-faint); margin-top:6px; }
+
+    /* History table */
+    .history-row {
+      display: grid;
+      grid-template-columns: 90px 110px 70px 85px 85px 85px 70px 70px 75px;
+      gap: 6px; align-items: center;
+      padding: 8px 4px; border-bottom: 1px solid var(--border);
+      font-size: 11px; font-family: var(--font-mono);
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-row:hover { background: var(--bg2); border-radius: var(--r); }
+    .history-header { color: var(--text-faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+    /* Cross-tab */
+    .xtab-table { width: 100%; border-collapse: collapse; }
+    .xtab-table th, .xtab-table td {
+      padding: 7px 10px; border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono); font-size: 11px; text-align: center;
+    }
+    .xtab-table th { color: var(--text-faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .xtab-table td:first-child { text-align: left; color: var(--text); }
+    .xtab-table tr:last-child td { border-bottom: none; }
+    .xtab-table tr:hover td { background: var(--bg2); }
+
+    .stat-pair {
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .stat-pair-val  { font-family: var(--font-mono); font-size: 28px; font-weight: 500; line-height: 1; }
+    .stat-pair-sub  { font-size: 12px; color: var(--text-dim); }
+    .stat-pair-mae  { font-family: var(--font-mono); font-size: 14px; color: var(--amber); }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-brand" href="index.html">Energy<span class="nav-brand-dot">.</span>Trader</a>
+  <ul class="nav-links">
+    <li><a href="index.html">Dashboard</a></li>
+    <li><a href="review.html" class="active">Review</a></li>
+    <li><a href="notes.html">Notes</a></li>
+    <li><a href="admin-lEqo0dka.html">Admin</a></li>
+  </ul>
+  <div class="nav-right"><button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()"><span class="theme-toggle-icon" id="theme-icon">☀️</span><span id="theme-label">Light</span></button></div>
+</nav>
+
+<div class="page">
+<div class="container">
+
+  <div class="page-hero">
+    <div class="page-hero-eyebrow">Performance</div>
+    <h1 class="page-hero-title">Prediction Review</h1>
+    <p class="page-hero-sub">Energy + congestion accuracy, MAE, error patterns, and full history.</p>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex items-center gap-3 mb-3" style="flex-wrap:wrap">
+    <span class="text-faint text-xs mono uppercase" style="letter-spacing:.14em">Period</span>
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-secondary btn-sm" data-days="30"  onclick="setPeriod(this)">30d</button>
+      <button class="btn btn-ghost    btn-sm" data-days="90"  onclick="setPeriod(this)">90d</button>
+      <button class="btn btn-ghost    btn-sm" data-days="180" onclick="setPeriod(this)">6mo</button>
+      <button class="btn btn-ghost    btn-sm" data-days="730" onclick="setPeriod(this)">All</button>
+    </div>
+    <div class="flex items-center gap-2" style="margin-left:auto;flex-wrap:wrap">
+      <label class="text-xs text-dim mono">Hub</label>
+      <select id="hub-filter" class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px;width:auto" onchange="loadHistory()">
+        <option value="">All hubs</option>
+      </select>
+      <label class="text-xs text-dim mono">Hour</label>
+      <select id="slot-filter" class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 8px;width:auto" onchange="loadHistory()">
+        <option value="">All hours</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="review-layout">
+
+    <!-- LEFT: hub cards + cross-tab + history -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+
+      <!-- Hub accuracy cards -->
+      <div>
+        <div class="section-head">
+          <h2>RT Energy Accuracy</h2>
+          <span class="text-xs text-faint mono">% accuracy · MAE in $/MWh</span>
+        </div>
+        <div class="grid-5" id="hub-acc-cards"></div>
+      </div>
+
+      <!-- Congestion accuracy cards -->
+      <div>
+        <div class="section-head">
+          <h2>Congestion Accuracy</h2>
+          <span class="text-xs text-faint mono">Tracked separately — different error patterns</span>
+        </div>
+        <div class="grid-5" id="cong-acc-cards"></div>
+      </div>
+
+      <!-- Tag × Hub cross-tab -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Error Pattern Cross-Tab</span>
+          <span class="text-xs text-dim" style="flex:1;margin-left:8px">Tag condition × hub accuracy — find your blind spots</span>
+        </div>
+        <div class="card-body card-body--flush" id="crosstab-wrap" style="overflow-x:auto">
+          <div class="skeleton" style="height:80px;margin:16px"></div>
+        </div>
+      </div>
+
+      <!-- History table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Prediction History</span>
+          <span class="text-xs text-dim mono" id="history-count"></span>
+        </div>
+        <div class="card-body card-body--flush" style="overflow-x:auto">
+          <div id="history-table" style="padding:0 4px;min-width:800px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: stats sidebar -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <!-- Overall energy -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">RT Energy — Overall</span></div>
+        <div class="card-body" id="overall-stat">
+          <div class="skeleton" style="height:60px"></div>
+        </div>
+      </div>
+
+      <!-- Overall congestion -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Congestion — Overall</span></div>
+        <div class="card-body" id="cong-stat">
+          <div class="skeleton" style="height:40px"></div>
+        </div>
+      </div>
+
+      <!-- By hour slot -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Energy by Hour Slot</span></div>
+        <div class="card-body" id="slot-stats">
+          <div class="skeleton" style="height:80px"></div>
+        </div>
+      </div>
+
+      <!-- Distribution -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Accuracy Distribution</span></div>
+        <div class="card-body" id="dist-stats">
+          <div class="skeleton" style="height:80px"></div>
+        </div>
+      </div>
+
+      <!-- Spike days note -->
+      <div class="card" style="border-color:rgba(245,166,35,0.3)">
+        <div class="card-header" style="border-color:rgba(245,166,35,0.2)">
+          <span class="card-title text-amber">⚡ Spike Day Note</span>
+        </div>
+        <div class="card-body">
+          <p class="text-xs text-dim" style="line-height:1.7">
+            Percentage accuracy can be misleading on spike days.
+            On a $200/MWh spike, being off by $30 shows as 85% — but that's a large miss in $ terms.
+            <br><br>
+            Always check <b class="text-amber">MAE ($/MWh)</b> alongside percentage accuracy,
+            especially on days tagged <b>high-price</b> or <b>congestion</b>.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer class="site-footer">© <span id="yr"></span> · Kevin Maresca · Energy Trader Portfolio</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/ui.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+// Build filters
+document.getElementById('hub-filter').innerHTML =
+  `<option value="">All hubs</option>` +
+  APP.HUBS.map(h => `<option value="${h.id}">${h.label}</option>`).join('');
+document.getElementById('slot-filter').innerHTML =
+  `<option value="">All hours</option>` +
+  APP.HOUR_SLOTS.map(s => `<option value="${s}">${APP.fmtHour(s)}</option>`).join('');
+
+let currentDays = 30;
+let cachedStats  = null;
+
+function setPeriod(btn) {
+  document.querySelectorAll('[data-days]').forEach(b => {
+    b.classList.remove('btn-secondary'); b.classList.add('btn-ghost');
+  });
+  btn.classList.remove('btn-ghost'); btn.classList.add('btn-secondary');
+  currentDays = parseInt(btn.dataset.days);
+  loadAll();
+}
+
+async function loadAll() {
+  cachedStats = null;
+  await Promise.all([loadStats(), loadHistory()]);
+}
+
+async function loadStats() {
+  const stats = await DB.getAccuracyStats({ days: currentDays });
+  cachedStats = stats;
+
+  // ── Overall energy ────────────────────────────────────
+  const oEl = document.getElementById('overall-stat');
+  if (stats.overall === null) {
+    oEl.innerHTML = '<p class="text-faint text-sm">Not enough graded data yet.</p><p class="text-xs text-faint mt-1">Enter actuals in Admin to build your accuracy history.</p>';
+  } else {
+    const cls = stats.overall >= 90 ? 'great' : stats.overall >= 75 ? 'good' : stats.overall >= 55 ? 'ok' : 'poor';
+    oEl.innerHTML = `
+      <div class="stat-pair mb-2">
+        <div class="stat-pair-val" style="color:var(--acc-${cls})">${stats.overall}%</div>
+        <div>
+          <div class="stat-pair-mae">MAE $${stats.mae?.toFixed(2) ?? '—'}/MWh</div>
+          <div class="stat-pair-sub">${stats.sampleSize} forecasts graded</div>
+        </div>
+      </div>
+      <div class="prog-bar"><div class="prog-bar-fill prog-bar-fill--${cls}" style="width:${stats.overall}%"></div></div>`;
+  }
+
+  // ── Overall congestion ────────────────────────────────
+  const cEl = document.getElementById('cong-stat');
+  if (stats.congestion === null) {
+    cEl.innerHTML = '<p class="text-faint text-sm">No congestion data yet.</p>';
+  } else {
+    const cls = stats.congestion >= 90 ? 'great' : stats.congestion >= 75 ? 'good' : stats.congestion >= 55 ? 'ok' : 'poor';
+    cEl.innerHTML = `
+      <div class="flex items-center gap-3 mb-2">
+        <div class="stat-pair-val" style="color:var(--purple)">${stats.congestion}%</div>
+        <div class="text-xs text-dim">${stats.congestionSampleSize} graded</div>
+      </div>
+      <div class="prog-bar"><div class="prog-bar-fill" style="width:${stats.congestion}%;background:var(--purple)"></div></div>`;
+  }
+
+  // ── Hub energy cards ──────────────────────────────────
+  document.getElementById('hub-acc-cards').innerHTML = APP.HUBS.map(hub => {
+    const acc = stats.byHub[hub.id];
+    const mae = stats.maeByHub[hub.id];
+    const cls = acc != null ? (acc >= 90 ? 'great' : acc >= 75 ? 'good' : acc >= 55 ? 'ok' : 'poor') : '';
+    return `<div class="hub-acc-card" style="--hub-color:${hub.color}">
+      <div class="hub-acc-main" style="color:${acc!=null?`var(--acc-${cls})`:'var(--text-faint)'}">${acc ?? '—'}</div>
+      ${mae != null ? `<div class="hub-acc-mae">MAE $${mae.toFixed(2)}</div>` : ''}
+      <div class="hub-acc-label">${hub.label}</div>
+    </div>`;
+  }).join('');
+
+  // ── Hub congestion cards ──────────────────────────────
+  document.getElementById('cong-acc-cards').innerHTML = APP.HUBS.map(hub => {
+    const acc = stats.congestionByHub[hub.id];
+    const cls = acc != null ? (acc >= 90 ? 'great' : acc >= 75 ? 'good' : acc >= 55 ? 'ok' : 'poor') : '';
+    return `<div class="hub-acc-card" style="--hub-color:${hub.color}">
+      <div class="hub-acc-main" style="color:${acc!=null?'var(--purple)':'var(--text-faint)'}">${acc ?? '—'}</div>
+      <div class="hub-acc-label">${hub.label} Cong.</div>
+    </div>`;
+  }).join('');
+
+  // ── By slot ───────────────────────────────────────────
+  // (computed in loadHistory from rows — placeholder for now)
+  // ── Cross-tab ─────────────────────────────────────────
+  renderCrosstab(stats.tagCrosstab ?? {});
+}
+
+function renderCrosstab(tagCrosstab) {
+  const el = document.getElementById('crosstab-wrap');
+  const tags = Object.keys(tagCrosstab);
+  if (!tags.length) {
+    el.innerHTML = '<p class="text-faint text-sm" style="padding:16px">No tagged data yet. Add tags to your daily entries to see pattern analysis.</p>';
+    return;
+  }
+
+  let html = `<table class="xtab-table">
+    <thead><tr>
+      <th style="text-align:left">Condition</th>
+      ${APP.HUBS.map(h => `<th>${UI.hubDot(h.id)} ${h.label}</th>`).join('')}
+    </tr></thead><tbody>`;
+
+  tags.sort().forEach(tag => {
+    const tagDef = APP.TAGS.find(t => t.value === tag);
+    html += `<tr><td>${UI.tagPill(tag)}</td>`;
+    APP.HUBS.forEach(hub => {
+      const acc = tagCrosstab[tag]?.[hub.id];
+      if (acc == null) { html += `<td><span class="text-faint">—</span></td>`; return; }
+      const cls = acc >= 90 ? 'great' : acc >= 75 ? 'good' : acc >= 55 ? 'ok' : 'poor';
+      html += `<td><span class="acc-badge acc-badge--${cls}">${acc}%</span></td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+async function loadHistory() {
+  const since = new Date();
+  since.setDate(since.getDate() - currentDays);
+  const startDate = since.toISOString().slice(0, 10);
+  const hubFilter  = document.getElementById('hub-filter').value;
+  const slotFilter = parseInt(document.getElementById('slot-filter').value) || null;
+
+  const data = await DB.getForecastsRange(startDate, APP.todayCPT());
+  let rows = data.filter(r => r.actual_energy !== null || r.pred_energy !== null);
+  if (hubFilter)  rows = rows.filter(r => r.hub === hubFilter);
+  if (slotFilter) rows = rows.filter(r => r.hour_slot === slotFilter);
+
+  document.getElementById('history-count').textContent = `${rows.length} records`;
+
+  // ── By slot ───────────────────────────────────────────
+  const bySlot = {};
+  APP.HOUR_SLOTS.forEach(s => bySlot[s] = { total: 0, count: 0 });
+  rows.filter(r => r.actual_energy !== null && r.pred_energy !== null).forEach(r => {
+    if (!bySlot[r.hour_slot]) return;
+    const acc = APP.accuracy(r.pred_energy, r.actual_energy);
+    if (acc !== null) { bySlot[r.hour_slot].total += acc; bySlot[r.hour_slot].count++; }
+  });
+  document.getElementById('slot-stats').innerHTML = APP.HOUR_SLOTS.map(s => {
+    const d   = bySlot[s];
+    const avg = d.count ? Math.round(d.total / d.count) : null;
+    const cls = avg >= 90 ? 'great' : avg >= 75 ? 'good' : avg >= 55 ? 'ok' : 'poor';
+    return `<div class="flex items-center gap-2 mb-2">
+      <span class="mono text-xs text-dim" style="min-width:72px">${APP.fmtHour(s)}</span>
+      <div class="prog-bar flex-1"><div class="prog-bar-fill prog-bar-fill--${cls}" style="width:${avg??0}%"></div></div>
+      <span class="mono text-xs" style="min-width:36px;text-align:right;color:var(--acc-${cls})">${avg ?? '—'}</span>
+    </div>`;
+  }).join('');
+
+  // ── Distribution ──────────────────────────────────────
+  const graded  = rows.filter(r => r.actual_energy !== null && r.pred_energy !== null);
+  const buckets = { '≥90': 0, '75-89': 0, '55-74': 0, '<55': 0 };
+  graded.forEach(r => {
+    const a = APP.accuracy(r.pred_energy, r.actual_energy);
+    if      (a >= 90) buckets['≥90']++;
+    else if (a >= 75) buckets['75-89']++;
+    else if (a >= 55) buckets['55-74']++;
+    else              buckets['<55']++;
+  });
+  const total = graded.length || 1;
+  document.getElementById('dist-stats').innerHTML = Object.entries(buckets).map(([label, count]) => {
+    const pct = Math.round(count / total * 100);
+    const cls = label === '≥90' ? 'great' : label === '75-89' ? 'good' : label === '55-74' ? 'ok' : 'poor';
+    return `<div class="flex items-center gap-2 mb-2">
+      <span class="mono text-xs text-dim" style="min-width:54px">${label}%</span>
+      <div class="prog-bar flex-1"><div class="prog-bar-fill prog-bar-fill--${cls}" style="width:${pct}%"></div></div>
+      <span class="mono text-xs text-dim" style="min-width:60px;text-align:right">${count} (${pct}%)</span>
+    </div>`;
+  }).join('');
+
+  // ── History table ─────────────────────────────────────
+  const tEl = document.getElementById('history-table');
+  if (!rows.length) {
+    tEl.innerHTML = '<p class="text-faint text-sm py-4 px-2">No forecasts in this period.</p>';
+    return;
+  }
+
+  tEl.innerHTML = `
+    <div class="history-row history-header" style="padding:6px 4px">
+      <span>Date</span><span>Hub</span><span>Hour</span>
+      <span>DAM</span><span>Forecast</span><span>Actual</span>
+      <span>Δ ($)</span><span>MAE</span><span>Acc.</span>
+    </div>
+    ${rows.map(r => {
+      const hasActual = r.actual_energy !== null && r.pred_energy !== null;
+      const diff = hasActual ? (r.actual_energy - r.pred_energy) : null;
+      const mae  = diff !== null ? Math.abs(diff) : null;
+      const diffEl = diff !== null
+        ? `<span style="color:${diff>0?'var(--red)':diff<0?'var(--green)':'var(--text-dim)'}">${diff>0?'+':''}${diff.toFixed(2)}</span>`
+        : '—';
+      const maeEl  = mae  !== null ? `<span style="color:var(--amber)">$${mae.toFixed(2)}</span>` : '—';
+      // Congestion mini-display
+      const hasCong = r.pred_congestion != null && r.actual_congestion != null;
+      const congStr = hasCong
+        ? `<div style="font-size:9px;color:var(--purple);margin-top:1px">C:${APP.fmtPrice(r.pred_congestion)}→${APP.fmtPrice(r.actual_congestion)}</div>`
+        : '';
+      return `<div class="history-row" style="padding:8px 4px">
+        <span class="text-dim">${APP.fmtDateShort(r.entry_date)}</span>
+        <span style="display:flex;align-items:center;gap:4px">${UI.hubDot(r.hub)} ${APP.hubById(r.hub)?.label ?? r.hub}</span>
+        <span>${APP.fmtHour(r.hour_slot)}</span>
+        <span>${UI.priceBadge(r.dam_price)}</span>
+        <span>${UI.priceBadge(r.pred_energy)}${congStr}</span>
+        <span>${hasActual ? UI.priceBadge(r.actual_energy) : '<span class="text-faint text-xs">pending</span>'}</span>
+        <span>${diffEl}</span>
+        <span>${maeEl}</span>
+        <span>${hasActual ? UI.accuracyBadge(r.pred_energy, r.actual_energy) : '<span class="acc-badge acc-badge--na">—</span>'}</span>
+      </div>`;
+    }).join('')}`;
+}
+
+loadAll();
+</script>
+<script>
+function toggleTheme() {
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("et-theme", next);
+  const icon = document.getElementById("theme-icon");
+  const lbl  = document.getElementById("theme-label");
+  if (icon) icon.textContent = next === "light" ? "🌙" : "☀️";
+  if (lbl)  lbl.textContent  = next === "light" ? "Dark" : "Light";
+}
+// Sync button state with current theme on load
+(function(){
+  const t = localStorage.getItem("et-theme") || "dark";
+  const icon = document.getElementById("theme-icon");
+  const lbl  = document.getElementById("theme-label");
+  if (icon) icon.textContent = t === "light" ? "🌙" : "☀️";
+  if (lbl)  lbl.textContent  = t === "light" ? "Dark" : "Light";
+})();
+</script>
+</body>
+</html>
