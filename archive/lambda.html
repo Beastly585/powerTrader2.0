@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>λ Predictor — Energy Trader</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('et-theme')||'dark');</script>
+  <style>
+    .lp-wrap { max-width: 1340px; margin: 0 auto; padding: 20px 24px 48px; }
+
+    /* ── Top bar ── */
+    .lp-topbar {
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap; margin-bottom: 16px;
+      padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .lp-badge {
+      font-family: var(--font-mono); font-size: 10px; padding: 4px 10px;
+      border-radius: var(--r); border: 1px solid var(--border);
+      color: var(--text-faint); display: flex; align-items: center; gap: 5px;
+    }
+    .lp-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+    .lp-badge.ok  .lp-status-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .lp-badge.err .lp-status-dot { background: var(--red); }
+    .lp-badge.loading .lp-status-dot { background: var(--amber); animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── 3-col layout ── */
+    .lp-layout {
+      display: grid;
+      grid-template-columns: 265px 1fr 330px;
+      gap: 14px; align-items: start;
+    }
+    @media(max-width:1100px){ .lp-layout { grid-template-columns: 265px 1fr; } }
+    @media(max-width:780px){  .lp-layout { grid-template-columns: 1fr; } }
+
+    /* ── Cards ── */
+    .lp-card { background: var(--bg1); border: 1px solid var(--border); border-radius: var(--r3); overflow: hidden; }
+    .lp-card + .lp-card { margin-top: 12px; }
+    .lp-hd { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .lp-hd-t { font-family: var(--font-mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .12em; color: var(--text-dim); }
+    .lp-bd { padding: 12px 14px; }
+
+    /* ── Fuel sliders ── */
+    .fc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .fc-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .fc-name { font-size: 11px; color: var(--text); width: 68px; flex-shrink: 0; }
+    .fc-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 2px; background: var(--border2); border-radius: 2px; outline: none; cursor: pointer; }
+    .fc-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--text-dim); cursor: pointer; }
+    .fc-slider::-webkit-slider-thumb:hover { background: var(--amber); }
+    .fc-val { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); width: 44px; text-align: right; }
+
+    /* ── Wx tiles ── */
+    .wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .wx-tile { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 7px 9px; }
+    .wx-id   { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+    .wx-val  { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+    .wx-sub  { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+
+    /* ── System lambda band ── */
+    .lambda-band { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); }
+    .lambda-cell { background: var(--bg2); padding: 10px 14px; text-align: center; }
+    .lambda-time  { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); margin-bottom: 4px; text-transform: uppercase; }
+    .lambda-price { font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+    .lambda-marg  { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); margin-top: 3px; }
+
+    /* ── Hub congestion table ── */
+    .hct { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .hct th { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-faint); padding: 6px 10px; border-bottom: 1px solid var(--border); font-weight: 500; text-align: left; }
+    .hct th.r, .hct td.r { text-align: right; }
+    .hct td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .hct tr:last-child td { border-bottom: none; }
+    .hct tr:hover td { background: var(--bg2); }
+    .hub-nc { display: flex; align-items: center; gap: 7px; }
+    .hub-bar { width: 3px; height: 18px; border-radius: 2px; flex-shrink: 0; }
+
+    /* congestion pill */
+    .cp { font-family: var(--font-mono); font-size: 10px; padding: 2px 7px; border-radius: 3px; display: inline-block; }
+    .cp-pos  { background: rgba(248,113,113,.12); color: var(--red); }
+    .cp-neg  { background: rgba(96,165,250,.12);  color: var(--blue); }
+    .cp-zero { background: var(--bg3); color: var(--text-faint); }
+
+    /* delta pill */
+    .dp { font-family: var(--font-mono); font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+    .dp-pos { background: rgba(248,113,113,.12); color: var(--red); }
+    .dp-neg { background: rgba(96,165,250,.12); color: var(--blue); }
+    .dp-ok  { background: rgba(52,211,153,.12); color: var(--green); }
+
+    /* ── Inner tabs ── */
+    .inner-tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); }
+    .inner-tab { font-family: var(--font-mono); font-size: 10px; padding: 8px 14px; color: var(--text-faint); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color var(--t); }
+    .inner-tab:hover { color: var(--text); }
+    .inner-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+    .inner-pane { display: none; padding: 14px; }
+    .inner-pane.active { display: block; }
+
+    /* ── Gen mix bars ── */
+    .gen-row   { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .gen-lbl   { font-size: 11px; color: var(--text-dim); width: 76px; text-align: right; flex-shrink: 0; }
+    .gen-track { flex: 1; height: 17px; background: var(--bg3); border-radius: var(--r); overflow: hidden; }
+    .gen-fill  { height: 100%; border-radius: var(--r); display: flex; align-items: center; padding-right: 5px; justify-content: flex-end; transition: width .5s ease; }
+    .gen-pct   { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,.75); }
+    .gen-gw    { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); width: 52px; }
+
+    /* ── Stack ── */
+    .stack-cols { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; align-items: end; }
+    .stack-col  { display: flex; flex-direction: column; justify-content: flex-end; height: 150px; }
+    .stack-seg  { border-top: 1px solid rgba(0,0,0,.25); cursor: default; }
+    .stack-seg:hover { opacity: .8; }
+    .stack-lbl  { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-align: center; margin-top: 5px; }
+    .stack-lam  { font-family: var(--font-mono); font-size: 11px; text-align: center; }
+
+    /* ── RT strip ── */
+    .rt-strip { display: flex; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; flex-wrap: wrap; margin-bottom: 14px; }
+    .rt-cell  { flex: 1; min-width: 90px; padding: 8px 12px; border-right: 1px solid var(--border); }
+    .rt-meta  { border-right: none; flex: 0 0 auto; padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
+    .rt-hub-lbl { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 3px; }
+    .rt-hub-p   { font-family: var(--font-mono); font-size: 16px; font-weight: 600; }
+    .rt-hub-age { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); margin-top: 1px; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); }
+
+    /* ── Map ── */
+    .map-svg { width: 100%; height: 490px; display: block; }
+    .map-overlay-box {
+      position: absolute; font-size: 10px;
+      background: rgba(17,19,24,.92); border: 1px solid var(--border2);
+      border-radius: var(--r2); padding: 8px 11px;
+    }
+    .map-leg { top: 40px; right: 10px; }
+    .map-fc  { bottom: 10px; left: 10px; }
+    .map-leg-title { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-faint); margin-bottom: 6px; }
+    .map-leg-row { display: flex; align-items: center; gap: 6px; color: var(--text-dim); margin-bottom: 3px; }
+    .map-leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .map-f-title { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-faint); margin-bottom: 5px; }
+    .map-f-row { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+
+    /* ── ERCOT links ── */
+    .ercot-links { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .cdr-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-family: var(--font-mono); font-size: 10px;
+      padding: 5px 10px; border-radius: var(--r);
+      background: rgba(245,166,35,.06); border: 1px solid rgba(245,166,35,.25);
+      color: var(--amber); text-decoration: none; transition: var(--t);
+    }
+    .cdr-pill:hover { background: rgba(245,166,35,.14); }
+
+    /* ── Notices ── */
+    .info-n { background: rgba(96,165,250,.06); border: 1px solid rgba(96,165,250,.2); border-left: 3px solid var(--blue); border-radius: var(--r2); padding: 8px 12px; font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+    .warn-n { background: rgba(245,166,35,.06); border: 1px solid rgba(245,166,35,.2); border-left: 3px solid var(--amber); border-radius: var(--r2); padding: 8px 12px; font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── Misc ── */
+    .cap-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .cap-tbl td { padding: 3px 0; color: var(--text-dim); }
+    .cap-tbl td:last-child { text-align: right; font-family: var(--font-mono); color: var(--text); }
+    .lp-log { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r2); padding: 8px 10px; height: 108px; overflow-y: auto; font-family: var(--font-mono); font-size: 10px; line-height: 1.6; }
+    .log-ok   { color: var(--green); }
+    .log-warn { color: var(--amber); }
+    .log-err  { color: var(--red); }
+    .log-dim  { color: var(--text-faint); }
+    .meth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 11px; color: var(--text-dim); line-height: 1.7; }
+    .meth-t { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .12em; color: var(--amber); margin-bottom: 5px; }
+    .merit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .merit-num { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); width: 14px; }
+    .merit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .merit-nm  { flex: 1; }
+    .merit-c   { font-family: var(--font-mono); font-size: 11px; color: var(--text); }
+    .cmp-tbl   { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .cmp-tbl th { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-faint); padding: 6px 10px; border-bottom: 1px solid var(--border); font-weight: 500; text-align: right; }
+    .cmp-tbl th:first-child { text-align: left; }
+    .cmp-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--font-mono); vertical-align: middle; }
+    .cmp-tbl td:first-child { text-align: left; }
+    .cmp-tbl tr:last-child td { border-bottom: none; }
+    .cmp-tbl tr:hover td { background: var(--bg2); }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-brand" href="index.html">Energy<span class="nav-brand-dot">.</span>Trader</a>
+  <ul class="nav-links">
+    <li><a href="index.html">Dashboard</a></li>
+    <li><a href="review.html">Review</a></li>
+    <li><a href="notes.html">Notes</a></li>
+    <li><a href="admin-lEqo0dka.html">Admin</a></li>
+    <li><a href="lambda.html" class="active">λ Predictor</a></li>
+    <li><a href="outages.html">Outages</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+      <span class="theme-toggle-icon" id="theme-icon">☀️</span>
+      <span id="theme-label">Light</span>
+    </button>
+  </div>
+</nav>
+
+<div class="page">
+<div class="lp-wrap">
+
+  <!-- ── Top bar: date controls ── -->
+  <div class="lp-topbar">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--amber);margin-bottom:4px;">Admin · Support Tool</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="date" id="targetDate"
+          style="font-family:var(--font-display);font-size:18px;font-weight:700;background:transparent;border:none;color:var(--text-hi);padding:0;outline:none;letter-spacing:-.01em;"
+          onchange="onDateChange()">
+        <span id="dateDow" style="font-family:var(--font-mono);font-size:11px;color:var(--amber);"></span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;">
+      <div class="lp-badge" id="modelBadge"><span class="lp-status-dot"></span><span id="modelBadgeTxt">Ready</span></div>
+      <div class="lp-badge" id="rtBadge"><span class="lp-status-dot"></span><span id="rtBadgeTxt">RT not loaded</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="fetchRT()" id="rtBtn">⟳ RT Prices</button>
+      <button class="btn btn-primary btn-sm" id="runBtn" onclick="runForecast()">
+        <span id="runSpinner" style="display:none">◌ </span><span id="runLbl">▶ Run Forecast</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── RT strip (hidden until loaded) ── -->
+  <div id="rtStripWrap" style="display:none;"></div>
+
+  <!-- ── ERCOT quick links ── -->
+  <div class="ercot-links">
+    <span style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);">ERCOT →</span>
+    <a class="cdr-pill" href="https://www.ercot.com/content/cdr/html/real_time_spp.html" target="_blank">RT SPP ↗</a>
+    <a class="cdr-pill" href="https://www.ercot.com/content/cdr/html/dam_spp.html" target="_blank">DAM SPP ↗</a>
+    <a class="cdr-pill" href="https://www.ercot.com/gridmktinfo/dashboards/fuelmix" target="_blank">Fuel Mix ↗</a>
+    <a class="cdr-pill" href="https://www.ercot.com/gridmktinfo/dashboards/outageinfo" target="_blank">Outages ↗</a>
+    <span id="rtFetchNote" style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);"></span>
+  </div>
+
+  <!-- ── 3-col layout ── -->
+  <div class="lp-layout">
+
+    <!-- LEFT: sidebar -->
+    <div>
+      <div class="lp-card">
+        <div class="lp-hd">
+          <span class="lp-hd-t">Fuel Cost ($/MWh)</span>
+          <button class="btn btn-ghost btn-sm" onclick="resetFuelCosts()" style="padding:2px 7px;font-size:9px;">Reset</button>
+        </div>
+        <div class="lp-bd">
+          <div class="info-n" style="margin-bottom:10px;font-size:10px;padding:6px 10px;">Lazard LCOE+ 2025 defaults.</div>
+          <div id="fuelSliders"></div>
+        </div>
+      </div>
+
+      <div class="lp-card">
+        <div class="lp-hd"><span class="lp-hd-t">Installed Capacity</span></div>
+        <div class="lp-bd" style="padding-top:8px;">
+          <table class="cap-tbl">
+            <tr><td>Nuclear</td><td>5,040 MW</td></tr>
+            <tr><td>Coal</td><td>12,800 MW</td></tr>
+            <tr><td>Gas CC</td><td>38,600 MW</td></tr>
+            <tr><td>Gas GT/CT</td><td>22,400 MW</td></tr>
+            <tr><td>Gas Steam</td><td>8,200 MW</td></tr>
+            <tr><td>Wind</td><td>42,000 MW</td></tr>
+            <tr><td>Solar</td><td>31,000 MW</td></tr>
+            <tr><td>Storage</td><td>9,500 MW</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="lp-card">
+        <div class="lp-hd">
+          <span class="lp-hd-t">Weather (Open-Meteo)</span>
+          <div class="lp-badge" id="wxBadge" style="font-size:9px;"><span class="lp-status-dot"></span><span id="wxBadgeTxt">—</span></div>
+        </div>
+        <div class="lp-bd" style="padding:10px;">
+          <div class="wx-grid" id="wxGrid">
+            <div class="wx-tile"><div class="wx-id">HB_NORTH</div><div class="wx-val">—</div></div>
+            <div class="wx-tile"><div class="wx-id">HB_HOUSTON</div><div class="wx-val">—</div></div>
+            <div class="wx-tile"><div class="wx-id">HB_SOUTH</div><div class="wx-val">—</div></div>
+            <div class="wx-tile"><div class="wx-id">HB_WEST</div><div class="wx-val">—</div></div>
+            <div class="wx-tile" style="grid-column:span 2"><div class="wx-id">HB_PAN</div><div class="wx-val">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lp-card">
+        <div class="lp-hd"><span class="lp-hd-t">Log</span></div>
+        <div class="lp-bd" style="padding:8px;">
+          <div class="lp-log" id="logArea">
+            <div class="log-dim">[λ Predictor · Energy.Trader]</div>
+            <div class="log-dim">[Set date → Run Forecast]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: analysis -->
+    <div>
+      <!-- System lambda band — ONE set of prices for the whole page -->
+      <div class="lp-card" style="margin-bottom:14px;">
+        <div class="lp-hd">
+          <span class="lp-hd-t">System Lambda · Merit-Order</span>
+          <span id="lambdaDateHint" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);"></span>
+        </div>
+        <div class="lambda-band" id="lambdaBand">
+          <div class="lambda-cell"><div class="lambda-time">7am</div><div class="lambda-price" style="color:var(--text-faint)">—</div><div class="lambda-marg">—</div></div>
+          <div class="lambda-cell"><div class="lambda-time">12pm</div><div class="lambda-price" style="color:var(--text-faint)">—</div><div class="lambda-marg">—</div></div>
+          <div class="lambda-cell"><div class="lambda-time">5pm</div><div class="lambda-price" style="color:var(--text-faint)">—</div><div class="lambda-marg">—</div></div>
+          <div class="lambda-cell"><div class="lambda-time">10pm</div><div class="lambda-price" style="color:var(--text-faint)">—</div><div class="lambda-marg">—</div></div>
+        </div>
+      </div>
+
+      <!-- Hub table: system λ + congestion = hub λ -->
+      <div class="lp-card" style="margin-bottom:14px;">
+        <div class="lp-hd">
+          <span class="lp-hd-t">Hub λ = System λ + Congestion</span>
+          <select id="congHourSel" onchange="renderCongTable()"
+            style="font-family:var(--font-mono);font-size:10px;padding:2px 6px;height:auto;">
+            <option value="7">7am</option>
+            <option value="12">12pm</option>
+            <option value="17" selected>5pm</option>
+            <option value="22">10pm</option>
+          </select>
+        </div>
+        <table class="hct">
+          <thead>
+            <tr>
+              <th>Hub</th>
+              <th class="r">System λ</th>
+              <th class="r">Congestion</th>
+              <th class="r">Hub λ</th>
+              <th class="r">RT SPP</th>
+              <th class="r">Delta</th>
+            </tr>
+          </thead>
+          <tbody id="congBody">
+            <tr><td colspan="6" style="text-align:center;padding:18px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">Run forecast to populate</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tabs -->
+      <div class="lp-card">
+        <div class="inner-tabs">
+          <div class="inner-tab active" onclick="switchTab('gen',this)">Generation Mix</div>
+          <div class="inner-tab" onclick="switchTab('stack',this)">Supply Stack</div>
+          <div class="inner-tab" onclick="switchTab('cmp',this)">RT Comparison</div>
+          <div class="inner-tab" onclick="switchTab('meth',this)">Model Notes</div>
+        </div>
+
+        <div class="inner-pane active" id="pane_gen">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <select id="genHourSel" onchange="renderGenMix()" style="font-family:var(--font-mono);font-size:10px;padding:3px 7px;height:auto;">
+              <option value="7">07:00 · Morning</option>
+              <option value="12">12:00 · Midday</option>
+              <option value="17" selected>17:00 · Peak</option>
+              <option value="22">22:00 · Evening</option>
+            </select>
+            <span id="genSummLine" style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);"></span>
+          </div>
+          <div id="genBars"></div>
+        </div>
+
+        <div class="inner-pane" id="pane_stack">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="stackLegend"></div>
+          <div class="stack-cols" id="stackCols"></div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:2px;" id="stackLbls"></div>
+        </div>
+
+        <div class="inner-pane" id="pane_cmp">
+          <div id="cmpContent">
+            <div class="warn-n">Load RT prices (⟳ button) to compare model forecasts against live ERCOT SPPs.</div>
+          </div>
+        </div>
+
+        <div class="inner-pane" id="pane_meth">
+          <div class="meth-grid">
+            <div>
+              <div class="meth-t">Merit-Order Stack</div>
+              <div id="meritList"></div>
+            </div>
+            <div>
+              <div class="meth-t">Hub Congestion (2022–2025)</div>
+              <div style="font-size:11px;color:var(--text-dim);line-height:1.7;">
+                <strong style="color:var(--text)">Panhandle</strong> — neg. when wind CF &gt;60%<br>
+                <strong style="color:var(--text)">West</strong> — pos. +4–12%, Permian Tx bottleneck<br>
+                <strong style="color:var(--text)">South</strong> — neg. from coastal wind spillover<br>
+                <strong style="color:var(--text)">North</strong> — near λ ±2%, most liquid hub<br>
+                <strong style="color:var(--text)">Houston</strong> — slight pos. during commercial peak
+              </div>
+            </div>
+            <div>
+              <div class="meth-t">Capacity Factors</div>
+              <div style="font-size:11px;color:var(--text-dim);line-height:1.7;">
+                <strong style="color:var(--text)">Solar</strong> — elevation angle × cloud cover penalty<br>
+                <strong style="color:var(--text)">Wind</strong> — power curve, cut-in 3 m/s, rated 12 m/s<br>
+                <strong style="color:var(--text)">Gas derate</strong> — 0.5%/°F above 60°F
+              </div>
+            </div>
+            <div>
+              <div class="meth-t">Demand Profile</div>
+              <div style="font-size:11px;color:var(--text-dim);line-height:1.7;">Summer 72 GW · Winter 65 GW · Shoulder 57 GW. Weekend −12%. +6% industrial growth (2026). Hourly shape from ERCOT 2024 actuals.</div>
+            </div>
+          </div>
+          <div class="warn-n" style="margin-top:12px;">±15–30% model uncertainty. Use as directional signal — always verify against DAM SPP before entering Admin predictions.</div>
+        </div>
+      </div>
+    </div><!-- /center -->
+
+    <!-- RIGHT: map (sticky) -->
+    <div class="lp-card" style="position:relative;">
+      <div class="lp-hd"><span class="lp-hd-t">Generation Assets &amp; Hub Zones</span></div>
+      <svg class="map-svg" id="ercotMap" viewBox="0 0 330 490" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="map-overlay-box map-leg" id="mapLeg">
+        <div class="map-leg-title">Generation Type</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#a78bfa"></span>Nuclear</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#6b7280"></span>Coal</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#f97316"></span>Gas CC</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#ef4444"></span>Gas GT/ST</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#34d399"></span>Wind</div>
+        <div class="map-leg-row"><span class="map-leg-dot" style="background:#f5a623"></span>Solar</div>
+        <div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px;">
+          <div class="map-leg-row"><span style="width:9px;height:9px;border-radius:2px;background:rgba(59,130,246,.18);border:1px solid rgba(59,130,246,.4);display:inline-block;flex-shrink:0"></span>Hub zone</div>
+        </div>
+      </div>
+      <div class="map-overlay-box map-fc" id="mapFc" style="display:none;"></div>
+    </div>
+
+  </div><!-- /layout -->
+</div><!-- /wrap -->
+</div><!-- /page -->
+
+<footer class="site-footer">© <span id="yr"></span> · Kevin Maresca &nbsp;·&nbsp; <span style="color:var(--text-faint)">λ Predictor · Admin Tool</span></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script>
+'use strict';
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* ─────────────────────────────────────────────────────────────
+   CONFIGURATION
+───────────────────────────────────────────────────────────── */
+const HUBS = (window.APP?.HUBS) ? APP.HUBS : [
+  { id:'HB_NORTH',   label:'North',     lat:32.78,  lon:-96.80,  color:'#3b82f6' },
+  { id:'HB_HOUSTON', label:'Houston',   lat:29.76,  lon:-95.37,  color:'#f59e0b' },
+  { id:'HB_SOUTH',   label:'South',     lat:29.42,  lon:-98.49,  color:'#10b981' },
+  { id:'HB_WEST',    label:'West',      lat:31.99,  lon:-102.08, color:'#ef4444' },
+  { id:'HB_PAN',     label:'Panhandle', lat:35.22,  lon:-101.83, color:'#8b5cf6' },
+];
+
+// Major generation plants [lat, lon, label, type, cap_MW]
+const PLANTS = [
+  // Nuclear
+  [32.26,-97.79,'Comanche Peak 1&2','nuclear',2440],
+  [28.80,-96.05,'South Texas Project','nuclear',2600],
+  // Coal
+  [32.86,-98.62,'Martin Lake','coal',2248],
+  [29.67,-95.62,'W.A. Parish','coal',2480],
+  [31.09,-97.38,'Sandow','coal',1143],
+  [34.12,-101.82,'Tolk','coal',1067],
+  [34.00,-101.15,'Harrington','coal',1072],
+  [29.01,-97.22,'Coleto Creek','coal',632],
+  [32.18,-97.45,'Monticello','coal',1900],
+  // Gas CC
+  [29.77,-95.37,'Greens Bayou CC','gas_cc',2490],
+  [29.57,-95.20,'Cedar Bayou CC','gas_cc',1898],
+  [32.78,-97.20,'Collin CC','gas_cc',1809],
+  [33.56,-101.78,'Tenaska Frontier','gas_cc',800],
+  [31.54,-102.88,'Odessa-Ector CC','gas_cc',600],
+  [31.96,-102.20,'Permian Basin CC','gas_cc',750],
+  [29.96,-95.74,'Channelview CC','gas_cc',850],
+  [32.30,-96.87,'Ennis CC','gas_cc',650],
+  // Gas GT/Steam
+  [29.76,-95.37,'Houston GT','gas_gt',800],
+  [32.80,-96.80,'Handley GT','gas_gt',576],
+  [27.80,-97.40,'Corpus Christi GT','gas_gt',640],
+  [33.12,-97.63,'Brazos GT','gas_gt',520],
+  // Wind clusters
+  [34.70,-102.20,'Panhandle Wind','wind',4500],
+  [34.40,-101.50,'South Plains Wind','wind',3200],
+  [31.50,-101.90,'Permian Wind','wind',5800],
+  [31.90,-102.70,'Roscoe Wind','wind',2200],
+  [30.50,-97.70,'Horse Hollow','wind',1500],
+  [27.50,-97.60,'Coastal Wind','wind',3600],
+  [28.00,-97.00,'Papalote Creek','wind',750],
+  [32.50,-96.60,'North TX Wind','wind',2800],
+  [33.90,-100.40,'Big Spring Wind','wind',1200],
+  // Solar farms
+  [31.40,-103.50,'Permian Solar','solar',4200],
+  [31.60,-101.90,'West TX Solar','solar',2800],
+  [32.30,-96.20,'North TX Solar','solar',1600],
+  [33.50,-97.80,'Brazos Solar','solar',1200],
+  [35.10,-102.50,'Panhandle Solar','solar',1400],
+  [29.90,-101.80,'Rattlesnake Creek Solar','solar',900],
+  [29.50,-95.70,'SE Texas Solar','solar',800],
+];
+
+const PLANT_COL = { nuclear:'#a78bfa', coal:'#6b7280', gas_cc:'#f97316', gas_gt:'#ef4444', wind:'#34d399', solar:'#f5a623' };
+
+const FUEL_DEFS = [
+  { key:'solar',   label:'Solar PV',  color:'#f5a623', min:0,  max:5,   step:.5, def:0  },
+  { key:'wind',    label:'Wind',      color:'#34d399', min:0,  max:5,   step:.5, def:0  },
+  { key:'nuclear', label:'Nuclear',   color:'#a78bfa', min:8,  max:30,  step:1,  def:11 },
+  { key:'coal',    label:'Coal',      color:'#6b7280', min:12, max:50,  step:1,  def:22 },
+  { key:'gas_cc',  label:'Gas CC',    color:'#f97316', min:20, max:100, step:1,  def:35 },
+  { key:'gas_st',  label:'Gas Steam', color:'#fb923c', min:25, max:120, step:5,  def:55 },
+  { key:'gas_gt',  label:'Gas GT/CT', color:'#ef4444', min:40, max:250, step:5,  def:75 },
+];
+
+const HOUR_LBL = {7:'7am', 12:'12pm', 17:'5pm', 22:'10pm'};
+
+/* ─────────────────────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────────────────────── */
+let FC = {};         FUEL_DEFS.forEach(d => FC[d.key] = d.def);
+let wxData   = {};   // hub.id → {temp[], wind[], cloud[], precip[]}
+let forecast = null; // {7:{demand,systemLambda,dispatched,hubs:{id:{hubPrice,congestion}}}, ...}
+let rtPrices = null; // {prices:{HB_NORTH:…}, interval}
+
+/* ─────────────────────────────────────────────────────────────
+   DATE
+───────────────────────────────────────────────────────────── */
+(function initDate(){
+  const d = new Date(); d.setDate(d.getDate()+1);
+  document.getElementById('targetDate').value = d.toLocaleDateString('en-CA',{timeZone:'America/Chicago'});
+  updateDateLabels();
+})();
+
+function onDateChange(){ updateDateLabels(); forecast = null; renderEmpty(); }
+
+function updateDateLabels(){
+  const v = document.getElementById('targetDate').value; if(!v) return;
+  const d = new Date(v+'T12:00:00');
+  document.getElementById('dateDow').textContent = d.toLocaleDateString('en-US',{weekday:'long'});
+  const hint = document.getElementById('lambdaDateHint');
+  if(hint) hint.textContent = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LOGGING / BADGES
+───────────────────────────────────────────────────────────── */
+function log(msg, t='dim'){
+  const a = document.getElementById('logArea');
+  const ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  const el = document.createElement('div'); el.className=`log-${t}`; el.textContent=`[${ts}] ${msg}`;
+  a.appendChild(el); a.scrollTop=a.scrollHeight;
+}
+function badge(id,txtId,state,text){
+  document.getElementById(id).className=`lp-badge ${state}`;
+  document.getElementById(txtId).textContent=text;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FUEL SLIDERS
+───────────────────────────────────────────────────────────── */
+(function buildSliders(){
+  document.getElementById('fuelSliders').innerHTML = FUEL_DEFS.map(d=>`
+    <div class="fc-row">
+      <span class="fc-dot" style="background:${d.color}"></span>
+      <span class="fc-name">${d.label}</span>
+      <input type="range" class="fc-slider" id="sl_${d.key}" min="${d.min}" max="${d.max}" step="${d.step}" value="${d.def}" oninput="updateFC('${d.key}',this.value)">
+      <span class="fc-val" id="fv_${d.key}">$${d.def}</span>
+    </div>`).join('');
+})();
+
+function updateFC(k,v){ FC[k]=parseFloat(v); document.getElementById(`fv_${k}`).textContent=`$${parseFloat(v).toFixed(k==='solar'||k==='wind'?1:0)}`; }
+function resetFuelCosts(){ FUEL_DEFS.forEach(d=>{ FC[d.key]=d.def; document.getElementById(`sl_${d.key}`).value=d.def; document.getElementById(`fv_${d.key}`).textContent=`$${d.def}`; }); renderMeritList(); log('Fuel costs reset','dim'); }
+
+/* ─────────────────────────────────────────────────────────────
+   WEATHER
+───────────────────────────────────────────────────────────── */
+async function fetchWeather(){
+  const date = document.getElementById('targetDate').value;
+  badge('wxBadge','wxBadgeTxt','loading','Fetching…');
+  const lats=HUBS.map(h=>h.lat).join(','), lons=HUBS.map(h=>h.lon).join(',');
+  const p=new URLSearchParams({latitude:lats,longitude:lons,
+    hourly:'temperature_2m,windspeed_100m,cloudcover,precipitation_probability',
+    temperature_unit:'fahrenheit',wind_speed_unit:'mph',timezone:'America/Chicago',forecast_days:7});
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json=await r.json(); const arr=Array.isArray(json)?json:[json];
+    HUBS.forEach((hub,i)=>{
+      const d=arr[i]; if(!d?.hourly){wxData[hub.id]=fallbackWx(hub.id);return;}
+      const si=d.hourly.time.findIndex(t=>t.startsWith(date));
+      wxData[hub.id]=si<0?fallbackWx(hub.id):{
+        temp:d.hourly.temperature_2m.slice(si,si+24),
+        wind:d.hourly.windspeed_100m.slice(si,si+24),
+        cloud:d.hourly.cloudcover.slice(si,si+24),
+        precip:d.hourly.precipitation_probability.slice(si,si+24),
+      };
+    });
+    badge('wxBadge','wxBadgeTxt','ok','Live'); renderWxGrid();
+    log(`Weather loaded for ${date}`,'ok');
+  }catch(e){
+    log(`Weather failed: ${e.message} — seasonal fallback`,'warn');
+    HUBS.forEach(h=>{wxData[h.id]=fallbackWx(h.id);});
+    badge('wxBadge','wxBadgeTxt','err','Seasonal'); renderWxGrid();
+  }
+}
+
+function fallbackWx(hubId){
+  const m=new Date(document.getElementById('targetDate').value+'T12:00').getMonth();
+  const s=m>=5&&m<=8,w=m===11||m<=1;
+  const tb=hubId==='HB_PAN'?(s?96:w?34:63):hubId==='HB_HOUSTON'?(s?91:w?52:72):(s?98:w?40:68);
+  const wb=hubId==='HB_PAN'?12:hubId==='HB_WEST'?9:6;
+  return{temp:Array.from({length:24},(_,h)=>tb+(h<14?h-7:7-h)*0.8),wind:Array.from({length:24},()=>wb+(Math.random()-.5)*3),cloud:Array.from({length:24},()=>(s?20:35)+(Math.random()*20)),precip:Array(24).fill(10)};
+}
+
+function renderWxGrid(){
+  document.getElementById('wxGrid').innerHTML=HUBS.map(hub=>{
+    const wx=wxData[hub.id];const ok=wx?.temp?.length;
+    const temp=ok?Math.round(wx.temp.slice(7,20).reduce((a,b)=>a+b)/13):null;
+    const wind=ok?(wx.wind.reduce((a,b)=>a+b)/24).toFixed(1):null;
+    const cloud=ok?Math.round(wx.cloud.reduce((a,b)=>a+b)/24):null;
+    const span=hub.id==='HB_PAN'?' style="grid-column:span 2"':'';
+    return`<div class="wx-tile"${span}><div class="wx-id" style="color:${hub.color}">${hub.id}</div><div class="wx-val">${ok?`${temp}°F · ${wind}mph`:'—'}</div><div class="wx-sub">${ok?`☁ ${cloud}%`:'Seasonal est.'}</div></div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PHYSICS
+───────────────────────────────────────────────────────────── */
+function solarCF(hubId,hour,cloud){
+  const hub=HUBS.find(h=>h.id===hubId)||{lat:31};
+  const d=new Date(document.getElementById('targetDate').value+'T12:00');
+  const doy=Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);
+  const decl=23.45*Math.sin((360/365*(doy-81))*Math.PI/180);
+  const sinE=Math.sin(hub.lat*Math.PI/180)*Math.sin(decl*Math.PI/180)+Math.cos(hub.lat*Math.PI/180)*Math.cos(decl*Math.PI/180)*Math.cos((hour-12)*15*Math.PI/180);
+  return Math.min(.95,Math.max(0,sinE)*(1-(cloud/100)*.75)*1.05);
+}
+function windCF(mph){const ms=mph/2.237;return ms<3||ms>25?0:ms>=12?.95:Math.pow((ms-3)/9,2.5)*.95;}
+function gasDerate(f){return Math.max(.70,1-Math.max(0,f-60)*.005);}
+function demandMW(hour){
+  const d=new Date(document.getElementById('targetDate').value+'T12:00');
+  const m=d.getMonth(),dow=d.getDay();
+  let base=m>=5&&m<=8?72:m===11||m<=1?65:57;
+  if(dow===0||dow===6)base*=.88;
+  base*=1.06;
+  const shape=[.82,.80,.79,.78,.80,.84,.92,.97,1,1.01,1,.99,.98,.98,.99,1.01,1.03,1.05,1.02,.99,.96,.93,.89,.85];
+  return base*shape[hour]*1000;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DISPATCH
+───────────────────────────────────────────────────────────── */
+function dispatch(hour){
+  const wts={HB_NORTH:1,HB_HOUSTON:.8,HB_SOUTH:1.2,HB_WEST:2.2,HB_PAN:1.8};
+  const totW=Object.values(wts).reduce((a,b)=>a+b,0);
+  const avgW=HUBS.reduce((s,h)=>s+(wxData[h.id]?.wind[hour]||6)*wts[h.id],0)/totW;
+  const avgC=HUBS.reduce((s,h)=>s+(wxData[h.id]?.cloud[hour]||30)*wts[h.id],0)/totW;
+  const avgT=HUBS.reduce((s,h)=>s+(wxData[h.id]?.temp[hour]||80)*wts[h.id],0)/totW;
+  const panW=wxData['HB_PAN']?.wind[hour]||10, westW=wxData['HB_WEST']?.wind[hour]||8;
+  const wCF=windCF(((panW*1.5)+(westW*1.5)+avgW)/4);
+  const dr=gasDerate(avgT);
+  const stack=[
+    {type:'solar',  color:'#f5a623',name:'Solar PV',  cost:FC.solar,   cap:31000*solarCF('HB_WEST',hour,avgC)},
+    {type:'wind',   color:'#34d399',name:'Wind',       cost:FC.wind,    cap:42000*wCF},
+    {type:'nuclear',color:'#a78bfa',name:'Nuclear',    cost:FC.nuclear, cap:5040*.93},
+    {type:'coal',   color:'#6b7280',name:'Coal',       cost:FC.coal,    cap:12800*.82},
+    {type:'gas_cc', color:'#f97316',name:'Gas CC',     cost:FC.gas_cc,  cap:38600*dr},
+    {type:'gas_st', color:'#fb923c',name:'Gas Steam',  cost:FC.gas_st,  cap:8200*dr},
+    {type:'gas_gt', color:'#ef4444',name:'Gas GT/CT',  cost:FC.gas_gt,  cap:22400*dr*.75},
+  ];
+  let rem=demandMW(hour),disp=[],lambda=FC.gas_gt;
+  for(const u of stack){if(rem<=0)break;const d=Math.min(rem,u.cap);if(d>20){disp.push({...u,dispatched:d});rem-=d;lambda=u.cost;}}
+  if(rem>500)lambda=Math.min(5000,FC.gas_gt*(1+rem/8000));
+  return{demand:demandMW(hour),systemLambda:lambda,dispatched:disp,remaining:Math.max(0,rem)};
+}
+
+/* ─────────────────────────────────────────────────────────────
+   HUB CONGESTION
+───────────────────────────────────────────────────────────── */
+function calcHubLambda(hubId, systemLambda, hour){
+  const wx=wxData[hubId]||fallbackWx(hubId);
+  const wCF=windCF(wx.wind[hour]||6);
+  const sCF=solarCF(hubId,hour,wx.cloud[hour]||30);
+  const m=new Date(document.getElementById('targetDate').value+'T12:00').getMonth();
+  let cong=0;
+  if(hubId==='HB_PAN')         cong=wCF>.6?-systemLambda*.09:-systemLambda*.04;
+  else if(hubId==='HB_WEST')   {cong=systemLambda*(.04+sCF*.7*.08);if(hour>=16&&hour<=20)cong*=1.6;}
+  else if(hubId==='HB_SOUTH')  {cong=wCF>.5?-systemLambda*.05:-systemLambda*.02;if(m>=5&&m<=8&&hour>=13&&hour<=18)cong+=systemLambda*.03;}
+  else if(hubId==='HB_NORTH')  cong=systemLambda*.01*(Math.random()>.5?1:-1);
+  else if(hubId==='HB_HOUSTON') cong=(hour>=7&&hour<=17)?systemLambda*.03:systemLambda*.01;
+  return{hubPrice:Math.max(0,systemLambda+cong),congestion:cong};
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PRICE HELPERS
+───────────────────────────────────────────────────────────── */
+function pCls(p){if(p==null)return'';if(p<0)return'price--neg';if(p<25)return'price--low';if(p<50)return'price--mid';if(p<100)return'price--high';return'price--spike';}
+function fP(p,d=1){return p==null?'—':'$'+p.toFixed(d);}
+
+/* ─────────────────────────────────────────────────────────────
+   MAIN FORECAST RUN
+───────────────────────────────────────────────────────────── */
+async function runForecast(){
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true;
+  document.getElementById('runSpinner').style.display='inline';
+  document.getElementById('runLbl').textContent='Running…';
+  badge('modelBadge','modelBadgeTxt','loading','Fetching weather…');
+  log('--- Forecast run starting ---','dim');
+
+  await fetchWeather();
+  badge('modelBadge','modelBadgeTxt','loading','Computing dispatch…');
+
+  forecast={};
+  for(const h of [7,12,17,22]){
+    const r=dispatch(h);
+    forecast[h]={...r,hubs:{}};
+    HUBS.forEach(hub=>{ forecast[h].hubs[hub.id]=calcHubLambda(hub.id,r.systemLambda,h); });
+    log(`${h}:00  demand=${(r.demand/1000).toFixed(1)}GW  λ=$${r.systemLambda.toFixed(1)}  marginal=${r.dispatched.at(-1)?.name||'—'}`,'ok');
+  }
+
+  badge('modelBadge','modelBadgeTxt','ok','Forecast ready');
+  btn.disabled=false;
+  document.getElementById('runSpinner').style.display='none';
+  document.getElementById('runLbl').textContent='↺ Re-run';
+  log('Forecast complete.','ok');
+
+  renderLambdaBand();
+  renderCongTable();
+  renderGenMix();
+  renderSupplyStack();
+  renderMeritList();
+  renderCmpTable();
+  renderMapForecast();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: LAMBDA BAND
+───────────────────────────────────────────────────────────── */
+function renderLambdaBand(){
+  if(!forecast)return;
+  document.getElementById('lambdaBand').innerHTML=[7,12,17,22].map(h=>{
+    const p=forecast[h]?.systemLambda;
+    const marg=forecast[h]?.dispatched?.at(-1)?.name||'—';
+    return`<div class="lambda-cell">
+      <div class="lambda-time">${HOUR_LBL[h]}</div>
+      <div class="lambda-price ${pCls(p)}">${fP(p,0)}</div>
+      <div class="lambda-marg">${marg}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: CONGESTION TABLE
+───────────────────────────────────────────────────────────── */
+function renderCongTable(){
+  if(!forecast)return;
+  const h=parseInt(document.getElementById('congHourSel').value);
+  const r=forecast[h]; if(!r)return;
+  document.getElementById('congBody').innerHTML=HUBS.map(hub=>{
+    const {hubPrice,congestion}=r.hubs[hub.id];
+    const cFmt=Math.abs(congestion)<.5?'≈$0':congestion>0?`+$${congestion.toFixed(1)}`:`-$${Math.abs(congestion).toFixed(1)}`;
+    const cCls=Math.abs(congestion)<.5?'cp-zero':congestion>0?'cp-pos':'cp-neg';
+    const rt=rtPrices?.prices[hub.id];
+    const delta=(rt!=null)?(hubPrice-rt):null;
+    return`<tr>
+      <td><div class="hub-nc"><div class="hub-bar" style="background:${hub.color}"></div><span style="font-family:var(--font-mono);font-size:11px;color:${hub.color}">${hub.id}</span></div></td>
+      <td class="r" style="font-family:var(--font-mono)" class="${pCls(r.systemLambda)}">${fP(r.systemLambda)}</td>
+      <td class="r"><span class="cp ${cCls}">${cFmt}</span></td>
+      <td class="r"><strong class="${pCls(hubPrice)}" style="font-family:var(--font-mono);font-size:13px">${fP(hubPrice)}</strong></td>
+      <td class="r" style="font-family:var(--font-mono)" class="${pCls(rt)}">${rt!=null?fP(rt):'—'}</td>
+      <td class="r">${delta!=null?`<span class="dp ${Math.abs(delta)<3?'dp-ok':delta>0?'dp-pos':'dp-neg'}">${delta>0?'+':''}$${delta.toFixed(1)}</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: GEN MIX
+───────────────────────────────────────────────────────────── */
+function renderGenMix(){
+  if(!forecast)return;
+  const h=parseInt(document.getElementById('genHourSel').value);
+  const r=forecast[h]; if(!r)return;
+  const total=r.dispatched.reduce((s,d)=>s+d.dispatched,0);
+  document.getElementById('genSummLine').textContent=`Demand: ${(r.demand/1000).toFixed(1)} GW  ·  λ: $${r.systemLambda.toFixed(1)}/MWh  ·  Marginal: ${r.dispatched.at(-1)?.name||'—'}`;
+  document.getElementById('genBars').innerHTML=r.dispatched.map(d=>{
+    const pct=(d.dispatched/Math.max(total,1)*100);
+    return`<div class="gen-row"><div class="gen-lbl">${d.name}</div><div class="gen-track"><div class="gen-fill" style="width:${pct.toFixed(1)}%;background:${d.color}">${pct>8?`<span class="gen-pct">${pct.toFixed(0)}%</span>`:''}</div></div><div class="gen-gw">${(d.dispatched/1000).toFixed(1)} GW</div></div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: SUPPLY STACK
+───────────────────────────────────────────────────────────── */
+function renderSupplyStack(){
+  if(!forecast)return;
+  const HOURS=[7,12,17,22];
+  const maxD=Math.max(...HOURS.map(h=>forecast[h]?.demand||0))*1.1;
+  const allT={};HOURS.forEach(h=>forecast[h]?.dispatched.forEach(d=>allT[d.type]=[d.color,d.name]));
+  document.getElementById('stackLegend').innerHTML=Object.entries(allT).map(([t,[c,n]])=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-faint)"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div>${n}</div>`).join('');
+  document.getElementById('stackCols').innerHTML=HOURS.map(h=>{
+    const segs=[...forecast[h].dispatched].reverse();
+    return`<div class="stack-col">${segs.map(d=>`<div class="stack-seg" style="height:${Math.max(3,d.dispatched/maxD*150).toFixed(1)}px;background:${d.color}" title="${d.name}: ${(d.dispatched/1000).toFixed(1)} GW"></div>`).join('')}</div>`;
+  }).join('');
+  document.getElementById('stackLbls').innerHTML=HOURS.map(h=>{const lam=forecast[h]?.systemLambda;return`<div class="stack-lbl">${HOUR_LBL[h]}<br><span class="stack-lam ${pCls(lam)}">${fP(lam,0)}</span></div>`;}).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: RT COMPARISON
+───────────────────────────────────────────────────────────── */
+function renderCmpTable(){
+  const wrap=document.getElementById('cmpContent');
+  if(!forecast){wrap.innerHTML='<div class="warn-n">Run forecast first.</div>';return;}
+  if(!rtPrices){wrap.innerHTML='<div class="warn-n">Load RT prices (⟳ button) to compare model forecasts against live ERCOT SPPs.</div>';return;}
+  const HOURS=[7,12,17,22];
+  wrap.innerHTML=`<table class="cmp-tbl"><thead><tr><th>Hub</th>${HOURS.map(h=>`<th>λ ${HOUR_LBL[h]}</th>`).join('')}<th>RT now</th><th>vs RT@5pm</th></tr></thead><tbody>${
+    HUBS.map(hub=>{
+      const rt=rtPrices.prices[hub.id];
+      const h17=forecast[17]?.hubs[hub.id]?.hubPrice;
+      const delta=(h17!=null&&rt!=null)?(h17-rt):null;
+      return`<tr><td style="font-family:var(--font-mono);color:${hub.color}">${hub.id}</td>${HOURS.map(h=>`<td class="${pCls(forecast[h]?.hubs[hub.id]?.hubPrice)}">${fP(forecast[h]?.hubs[hub.id]?.hubPrice)}</td>`).join('')}<td class="${pCls(rt)}">${rt!=null?fP(rt):'—'}</td><td>${delta!=null?`<span class="dp ${Math.abs(delta)<3?'dp-ok':delta>0?'dp-pos':'dp-neg'}">${delta>0?'+':''}$${delta.toFixed(1)}</span>`:'—'}</td></tr>`;
+    }).join('')
+  }</tbody></table><div style="margin-top:8px;font-size:10px;color:var(--text-faint);font-family:var(--font-mono)">RT: ${rtPrices.interval} · D+1 forecast vs current RT is directional only.</div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: MAP
+───────────────────────────────────────────────────────────── */
+function renderMap(){
+  const svg=document.getElementById('ercotMap');
+  const W=330,H=490,minLon=-107,maxLon=-93,minLat=25.5,maxLat=36.8;
+  const tx=lon=>(lon-minLon)/(maxLon-minLon)*W;
+  const ty=lat=>(1-(lat-minLat)/(maxLat-minLat))*H;
+
+  const dark=document.documentElement.getAttribute('data-theme')!=='light';
+  const fillBg=dark?'#0c0e12':'#f5f6f8';
+  const fillTX=dark?'#111318':'#ffffff';
+  const stroke=dark?'#252c38':'#d1d5db';
+  const dimTxt=dark?'#404d5e':'#9ca3af';
+
+  // Texas outline
+  const txPts=[[-106.7,31.9],[-104.0,29.0],[-103.0,28.9],[-100.0,28.0],[-97.4,26.1],[-96.5,25.8],[-94.0,26.0],[-93.9,29.8],[-94.0,33.5],[-94.1,36.5],[-100.0,36.5],[-103.0,36.5],[-103.0,32.0],[-106.7,31.9]];
+  const txPath='M '+txPts.map(([lo,la])=>`${tx(lo).toFixed(1)},${ty(la).toFixed(1)}`).join(' L ')+' Z';
+
+  let m=`<rect width="${W}" height="${H}" fill="${fillBg}"/>`;
+  m+=`<path d="${txPath}" fill="${fillTX}" stroke="${stroke}" stroke-width="1"/>`;
+
+  // Hub zone circles + labels
+  const hubPos={HB_PAN:[-102,35.0],HB_WEST:[-102,31.2],HB_NORTH:[-97.5,33.0],HB_SOUTH:[-98.5,28.5],HB_HOUSTON:[-95.2,29.7]};
+  HUBS.forEach(hub=>{
+    const[lo,la]=hubPos[hub.id]||[hub.lon,hub.lat];
+    const x=tx(lo).toFixed(1),y=ty(la).toFixed(1);
+    m+=`<circle cx="${x}" cy="${y}" r="32" fill="${hub.color}18" stroke="${hub.color}55" stroke-width="1"/>`;
+    m+=`<text x="${x}" y="${(parseFloat(y)+3).toFixed(1)}" text-anchor="middle" font-family="'DM Mono',monospace" font-size="7.5" font-weight="600" fill="${hub.color}">${hub.label.toUpperCase()}</text>`;
+    // placeholder for lambda overlay
+    m+=`<text id="maplam_${hub.id}" x="${x}" y="${(parseFloat(y)+14).toFixed(1)}" text-anchor="middle" font-family="'DM Mono',monospace" font-size="8" fill="${dimTxt}">—</text>`;
+  });
+
+  // Generation plants
+  PLANTS.forEach(([lat,lon,name,type,cap])=>{
+    if(lat<minLat||lat>maxLat||lon<minLon||lon>maxLon)return;
+    const x=tx(lon).toFixed(1),y=ty(lat).toFixed(1);
+    const r=Math.max(2.5,Math.sqrt(cap)/15).toFixed(1);
+    const c=PLANT_COL[type]||'#888';
+    m+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${c}cc" stroke="${c}" stroke-width=".4"><title>${name} · ${cap.toLocaleString()} MW</title></circle>`;
+  });
+
+  m+=`<text x="5" y="13" font-family="'DM Mono',monospace" font-size="7" fill="${dimTxt}" letter-spacing="1">ERCOT GRID</text>`;
+  svg.innerHTML=m;
+}
+
+function renderMapForecast(){
+  if(!forecast)return;
+  const h=17; // show 5pm in overlay
+  const dark=document.documentElement.getAttribute('data-theme')!=='light';
+  HUBS.forEach(hub=>{
+    const el=document.getElementById(`maplam_${hub.id}`); if(!el)return;
+    const p=forecast[h]?.hubs[hub.id]?.hubPrice;
+    el.textContent=p!=null?`$${p.toFixed(0)}`:'—';
+    el.setAttribute('fill',p==null?(dark?'#404d5e':'#9ca3af'):p<25?'#34d399':p<50?'#fbbf24':p<100?'#f87171':'#e879f9');
+  });
+  const fc=document.getElementById('mapFc');
+  fc.style.display='block';
+  fc.innerHTML=`<div class="map-f-title">Hub λ · 5pm</div>${HUBS.map(hub=>{
+    const p=forecast[h]?.hubs[hub.id]?.hubPrice;
+    return`<div class="map-f-row"><div style="width:6px;height:6px;border-radius:50%;background:${hub.color};flex-shrink:0"></div><span style="color:var(--text-dim);min-width:58px;font-size:10px">${hub.label}</span><span class="${pCls(p)}" style="font-family:var(--font-mono);font-size:11px">${fP(p,1)}</span></div>`;
+  }).join('')}`;
+}
+
+// Draw map on load
+renderMap();
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER: MERIT LIST
+───────────────────────────────────────────────────────────── */
+function renderMeritList(){
+  document.getElementById('meritList').innerHTML=FUEL_DEFS.map((d,i)=>`<div class="merit-row"><span class="merit-num">${i+1}</span><span class="merit-dot" style="background:${d.color}"></span><span class="merit-nm">${d.label}</span><span class="merit-c">$${FC[d.key].toFixed(d.key==='solar'||d.key==='wind'?1:0)}/MWh</span></div>`).join('');
+}
+renderMeritList();
+
+/* ─────────────────────────────────────────────────────────────
+   EMPTY STATE
+───────────────────────────────────────────────────────────── */
+function renderEmpty(){
+  document.getElementById('lambdaBand').innerHTML=[7,12,17,22].map(h=>`<div class="lambda-cell"><div class="lambda-time">${HOUR_LBL[h]}</div><div class="lambda-price" style="color:var(--text-faint)">—</div><div class="lambda-marg">—</div></div>`).join('');
+  document.getElementById('congBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">Run forecast to populate</td></tr>';
+  document.getElementById('genBars').innerHTML='';
+  document.getElementById('stackCols').innerHTML='';
+  document.getElementById('stackLbls').innerHTML='';
+  document.getElementById('cmpContent').innerHTML='<div class="warn-n">Load RT prices (⟳ button) to compare model forecasts against live ERCOT SPPs.</div>';
+  document.getElementById('mapFc').style.display='none';
+  HUBS.forEach(hub=>{ const el=document.getElementById(`maplam_${hub.id}`); if(el)el.textContent='—'; });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RT PRICES
+───────────────────────────────────────────────────────────── */
+async function fetchRT(){
+  badge('rtBadge','rtBadgeTxt','loading','Fetching…');
+  document.getElementById('rtFetchNote').textContent='';
+  const target=encodeURIComponent('https://www.ercot.com/content/cdr/html/real_time_spp.html');
+  const proxies=[
+    `https://api.allorigins.win/get?url=${target}`,
+    `https://corsproxy.io/?${target}`,
+  ];
+  for(const pu of proxies){
+    try{
+      const r=await fetch(pu,{signal:AbortSignal.timeout(7000)});
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const isAllOrigins=pu.includes('allorigins');
+      const html=isAllOrigins?(await r.json()).contents:await r.text();
+      if(!html||html.length<200) throw new Error('Empty response');
+      if(parseRtHtml(html)) return;
+    }catch(e){ log(`RT proxy ${pu.includes('allorigins')?'allorigins':'corsproxy'} failed: ${e.message}`,'warn'); }
+  }
+  badge('rtBadge','rtBadgeTxt','err','Use links ↗');
+  document.getElementById('rtFetchNote').textContent='Auto-fetch blocked — read RT SPP ↗ manually';
+  log('RT fetch failed on all proxies. Open RT SPP ↗ above to read prices manually.','warn');
+}
+
+function parseRtHtml(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const rows=doc.querySelectorAll('table tr');
+  if(!rows.length){badge('rtBadge','rtBadgeTxt','err','Parse error');return false;}
+  const colMap={};
+  rows[0].querySelectorAll('th,td').forEach((th,i)=>{colMap[th.textContent.trim()]=i;});
+  const TGTS=['HB_HOUSTON','HB_NORTH','HB_PAN','HB_SOUTH','HB_WEST'];
+  const prices={};let interval='—';
+  for(let i=rows.length-1;i>=1;i--){
+    const cells=rows[i].querySelectorAll('td');if(cells.length<5)continue;
+    interval=cells[colMap['Interval Ending']??1]?.textContent.trim()||'—';
+    TGTS.forEach(hub=>{const col=colMap[hub];if(col!=null){const v=parseFloat(cells[col]?.textContent.replace(/[^0-9.\-]/g,''));if(!isNaN(v))prices[hub]=v;}});
+    break;
+  }
+  if(!Object.keys(prices).length){badge('rtBadge','rtBadgeTxt','err','Parse error');log('RT: no prices found','warn');return false;}
+  rtPrices={prices,interval,fetchedAt:new Date()};
+  badge('rtBadge','rtBadgeTxt','ok',`RT ${interval}`);
+  renderRtStrip();renderCongTable();renderCmpTable();
+  log(`RT: ${TGTS.filter(h=>prices[h]).map(h=>`${h.replace('HB_','')}=$${prices[h]?.toFixed(1)}`).join(' · ')}`,'ok');
+  return true;
+}
+
+function renderRtStrip(){
+  if(!rtPrices)return;
+  const TGTS=['HB_NORTH','HB_HOUSTON','HB_SOUTH','HB_WEST','HB_PAN'];
+  document.getElementById('rtStripWrap').style.display='block';
+  document.getElementById('rtStripWrap').innerHTML=`<div class="rt-strip">${
+    TGTS.map(hid=>{const hub=HUBS.find(h=>h.id===hid),p=rtPrices.prices[hid];return`<div class="rt-cell"><div class="rt-hub-lbl" style="color:${hub?.color}">${hub?.label||hid}</div><div class="rt-hub-p ${pCls(p)}">${p!=null?fP(p):'—'}</div><div class="rt-hub-age">RT · ${rtPrices.interval}</div></div>`;}).join('')}
+    <div class="rt-cell rt-meta"><div class="live-dot"></div><span style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint)">LIVE RT SPP</span></div>
+  </div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TABS / THEME
+───────────────────────────────────────────────────────────── */
+function switchTab(id,btn){
+  document.querySelectorAll('.inner-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.inner-pane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`pane_${id}`)?.classList.add('active');
+}
+function toggleTheme(){
+  const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);localStorage.setItem('et-theme',next);
+  document.getElementById('theme-icon').textContent=next==='light'?'🌙':'☀️';
+  document.getElementById('theme-label').textContent=next==='light'?'Dark':'Light';
+  renderMap();if(forecast)renderMapForecast();
+}
+(function(){const t=localStorage.getItem('et-theme')||'dark';document.getElementById('theme-icon').textContent=t==='light'?'🌙':'☀️';document.getElementById('theme-label').textContent=t==='light'?'Dark':'Light';})();
+</script>
+</body>
+</html>

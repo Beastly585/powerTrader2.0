@@ -217,73 +217,92 @@ const DB = (() => {
     const rows = fcRes.data ?? [];
     if (!rows.length) return { overall: null, byHub: {}, congestion: null, congestionByHub: {}, mae: null, maeByHub: {}, sampleSize: 0, tagCrosstab: {} };
 
-    // ── Energy accuracy + MAE ──────────────────────────────
-    let totalPctErr = 0, totalAbsErr = 0, count = 0;
-    const byHub = {};
+    // Also fetch DAM prices for the same rows so we can use the DAM-adjusted accuracy
+    // (dam_price lives on the same hub_forecasts rows — already selected above)
+    // Re-fetch with dam_price included
+    const fcWithDam = await sbNew.from('hub_forecasts')
+      .select('hub, hour_slot, entry_date, pred_energy, actual_energy, pred_congestion, actual_congestion, dam_price')
+      .gte('entry_date', startDate)
+      .not('actual_energy', 'is', null)
+      .not('pred_energy', 'is', null);
 
-    // ── Congestion accuracy ────────────────────────────────
+    const dataRows = fcWithDam.error ? rows : (fcWithDam.data ?? rows);
+
+    let totalScore = 0, totalAbsErr = 0, count = 0;
+    const byHub = {};
     let congTotalPctErr = 0, congCount = 0;
     const congByHub = {};
-
-    // ── Tag cross-tab: tag → hub → {totalPctErr, count} ───
     const tagCrosstab = {};
 
-    rows.forEach(r => {
-      const pctErr = Math.abs(r.pred_energy - r.actual_energy) / Math.max(Math.abs(r.actual_energy), 1);
-      const absErr = Math.abs(r.pred_energy - r.actual_energy);
-      totalPctErr += pctErr;
+    dataRows.forEach(r => {
+      // Total forecast = lambda + congestion (the actual prediction at each hub)
+      const predTotal = (r.pred_energy != null && r.pred_congestion != null)
+        ? r.pred_energy + r.pred_congestion
+        : r.pred_energy;
+      if (predTotal === null) return;
+
+      // Use the same DAM-adjusted formula as the per-entry display for consistency
+      const score = APP.accuracy(predTotal, r.actual_energy, r.dam_price);
+      if (score === null) return;
+
+      const absErr = Math.abs(predTotal - r.actual_energy);
+      totalScore  += score;
       totalAbsErr += absErr;
       count++;
 
-      if (!byHub[r.hub]) byHub[r.hub] = { totalPctErr: 0, totalAbsErr: 0, count: 0 };
-      byHub[r.hub].totalPctErr += pctErr;
-      byHub[r.hub].totalAbsErr += absErr;
+      if (!byHub[r.hub]) byHub[r.hub] = { totalScore: 0, totalAbsErr: 0, count: 0 };
+      byHub[r.hub].totalScore   += score;
+      byHub[r.hub].totalAbsErr  += absErr;
       byHub[r.hub].count++;
 
-      // Congestion
-      if (r.pred_congestion != null && r.actual_congestion != null && r.actual_congestion !== 0) {
-        const cPctErr = Math.abs(r.pred_congestion - r.actual_congestion) / Math.max(Math.abs(r.actual_congestion), 1);
-        congTotalPctErr += cPctErr;
-        congCount++;
-        if (!congByHub[r.hub]) congByHub[r.hub] = { totalPctErr: 0, count: 0 };
-        congByHub[r.hub].totalPctErr += cPctErr;
-        congByHub[r.hub].count++;
+      // Congestion accuracy (separate tracking, no DAM adjustment)
+      if (r.pred_congestion != null && r.actual_congestion != null) {
+        const cScore = APP.accuracy(r.pred_congestion, r.actual_congestion);
+        if (cScore !== null) {
+          congTotalPctErr += (100 - cScore) / 100;
+          congCount++;
+          if (!congByHub[r.hub]) congByHub[r.hub] = { totalPctErr: 0, count: 0 };
+          congByHub[r.hub].totalPctErr += (100 - cScore) / 100;
+          congByHub[r.hub].count++;
+        }
       }
 
       // Tag cross-tab
       const entryTags = tagMap[r.entry_date] ?? [];
       entryTags.forEach(tag => {
         if (!tagCrosstab[tag]) tagCrosstab[tag] = {};
-        if (!tagCrosstab[tag][r.hub]) tagCrosstab[tag][r.hub] = { totalPctErr: 0, count: 0 };
-        tagCrosstab[tag][r.hub].totalPctErr += pctErr;
+        if (!tagCrosstab[tag][r.hub]) tagCrosstab[tag][r.hub] = { totalScore: 0, count: 0 };
+        tagCrosstab[tag][r.hub].totalScore += score;
         tagCrosstab[tag][r.hub].count++;
       });
     });
 
-    const acc  = (pctErr, n) => n ? Math.max(0, Math.round((1 - pctErr / n) * 100)) : null;
-    const mae  = (absErr, n) => n ? Math.round((absErr / n) * 100) / 100 : null;
+    if (!count) return { overall: null, byHub: {}, congestion: null, congestionByHub: {}, mae: null, maeByHub: {}, sampleSize: 0, tagCrosstab: {} };
 
-    const overall      = acc(totalPctErr, count);
-    const overallMae   = mae(totalAbsErr, count);
-    const congOverall  = congCount ? acc(congTotalPctErr, congCount) : null;
+    const overall    = Math.round(totalScore / count);
+    const overallMae = Math.round((totalAbsErr / count) * 100) / 100;
 
     const hubAcc = {}, hubMae = {}, hubCongAcc = {};
     Object.entries(byHub).forEach(([hub, d]) => {
-      hubAcc[hub] = acc(d.totalPctErr, d.count);
-      hubMae[hub] = mae(d.totalAbsErr, d.count);
+      hubAcc[hub] = Math.round(d.totalScore / d.count);
+      hubMae[hub] = Math.round((d.totalAbsErr / d.count) * 100) / 100;
     });
     Object.entries(congByHub).forEach(([hub, d]) => {
-      hubCongAcc[hub] = acc(d.totalPctErr, d.count);
+      hubCongAcc[hub] = Math.max(0, Math.round((1 - d.totalPctErr / d.count) * 100));
     });
 
-    // Resolve tag cross-tab to accuracy numbers
+    // Resolve tag cross-tab
     const tagCrosstabAcc = {};
     Object.entries(tagCrosstab).forEach(([tag, hubs]) => {
       tagCrosstabAcc[tag] = {};
       Object.entries(hubs).forEach(([hub, d]) => {
-        tagCrosstabAcc[tag][hub] = acc(d.totalPctErr, d.count);
+        tagCrosstabAcc[tag][hub] = Math.round(d.totalScore / d.count);
       });
     });
+
+    const congOverall = congCount
+      ? Math.max(0, Math.round((1 - congTotalPctErr / congCount) * 100))
+      : null;
 
     return {
       overall, byHub: hubAcc,

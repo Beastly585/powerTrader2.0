@@ -639,17 +639,83 @@ textarea { min-height: 90px; resize: vertical; font-size: 13px; line-height: 1.5
 .modal-close:hover { color: var(--text); background: var(--bg3); }
 .modal-body { padding: 20px; }
 
-/* ── Responsive ───────────────────────────────────────── */
+/* ── Responsive — tablet ──────────────────────────────── */
 @media (max-width: 900px) {
   .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
   .hide-mobile { display: none !important; }
+  /* Admin: full width on tablet */
+  .hfc-grid { grid-template-columns: 1fr !important; }
 }
-@media (max-width: 600px) {
+
+/* ── Responsive — mobile ──────────────────────────────── */
+@media (max-width: 640px) {
+  :root { --nav-h: 48px; --ticker-h: 44px; }
+
   .grid-3, .grid-4, .grid-5, .grid-2 { grid-template-columns: 1fr; }
-  .container { padding: 0 12px; }
+  .container { padding: 0 10px; }
+
+  /* Nav */
+  .nav { padding: 0 12px; }
   .nav-links { display: none; }
-  .forecast-row { grid-template-columns: 1fr 1fr; }
+  .nav-brand-sub { display: none; }
+  .nav-brand { font-size: 14px; }
+
+  /* Ticker — scrollable, smaller */
+  .hub-ticker-item { padding: 4px 12px; }
+  .hub-ticker-price { font-size: 13px; }
+  .hub-ticker-sub, .hub-ticker-wx { display: none; } /* just show price on mobile */
+  .hub-ticker-meta { padding: 4px 10px; }
+
+  /* Index main grid — single column, no sidebar */
+  .main-grid { grid-template-columns: 1fr !important; padding-bottom: 40px; }
+  .col-right { display: none; } /* hide right sidebar on mobile */
+
+  /* Map */
+  #tx-map { height: 260px !important; }
+  .map-controls { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+
+  /* Log sections */
+  .log-section-body { padding: 12px; }
+  .pred-table th, .pred-table td { padding: 6px 6px; font-size: 11px; }
+  /* On mobile, hide less critical columns in pred table */
+  .pred-table .hide-xs { display: none; }
+
+  /* Day picker */
+  .day-picker { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+  .day-picker input[type=date] { font-size: 15px; }
+
+  /* Admin */
+  .main-content { padding: 12px; }
+  .day-nav { flex-wrap: wrap; gap: 6px; }
+  .admin-tabs-wrap > div { flex-wrap: wrap; }
+  .admin-tabs-wrap .tabs { padding-left: 0; }
+  #global-slot-tabs { border-left: none; border-top: 1px solid var(--border); padding: 6px 12px; width: 100%; }
+  .hfc-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .fc-row { grid-template-columns: 1fr !important; gap: 8px; }
+  .save-bar { padding: 10px 12px; }
+
+  /* Review page */
+  .review-layout { grid-template-columns: 1fr !important; }
+  .history-row { grid-template-columns: 70px 80px 60px 70px 70px 60px !important; font-size: 10px; }
+
+  /* Notes sidebar */
+  .notes-layout { grid-template-columns: 1fr !important; }
+  .notes-sidebar { position: static; height: auto; }
+
+  /* Forms */
+  input, select, textarea { font-size: 16px; } /* prevent iOS zoom on focus */
+  .btn { padding: 8px 14px; }
+  .btn-sm { padding: 6px 10px; font-size: 10px; }
+  .field-inline, .field-inline-3 { grid-template-columns: 1fr !important; }
+  .outage-row { grid-template-columns: 1fr auto !important; }
+  .news-item-row { grid-template-columns: 1fr auto !important; }
+}
+
+/* ── Responsive — very small ──────────────────────────── */
+@media (max-width: 380px) {
+  .hub-ticker-name { display: none; }
+  .nav-brand span:last-child { display: none; }
 }
 
 /* ── Misc page chrome ─────────────────────────────────── */

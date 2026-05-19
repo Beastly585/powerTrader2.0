@@ -38,8 +38,8 @@ const UI = (() => {
   }
 
   // ── Accuracy badge ───────────────────────────────────────
-  function accuracyBadge(pred, actual) {
-    const acc = APP.accuracy(pred, actual);
+  function accuracyBadge(pred, actual, dam) {
+    const acc = APP.accuracy(pred, actual, dam);
     if (acc === null) return `<span class="acc-badge acc-badge--na">N/A</span>`;
     const cls = acc >= 90 ? 'great' : acc >= 75 ? 'good' : acc >= 55 ? 'ok' : 'poor';
     return `<span class="acc-badge acc-badge--${cls}">${acc}%</span>`;

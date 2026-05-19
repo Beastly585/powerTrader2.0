@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kevin Maresca — ERCOT Market Analysis</title>
+  <meta name="description" content="Independent ERCOT day-ahead price forecasting — daily LMP predictions across Texas hubs with tracked accuracy.">
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('et-theme') || 'dark');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0b0e;--bg1:#0f1117;--bg2:#161b26;--bg3:#1e2535;
+      --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+      --text:#c9d1e0;--text-dim:#7a8599;--text-hi:#f0f4ff;
+      --amber:#f5a623;--amber2:rgba(245,166,35,0.11);
+      --green:#34d399;--blue:#60a5fa;--purple:#a78bfa;--red:#f87171;
+      --mono:'IBM Plex Mono',monospace;
+      --serif:'Playfair Display',Georgia,serif;
+      --sans:'DM Sans',system-ui,sans-serif;
+      --r:4px;--r2:8px;--r3:12px;--t:0.15s ease;
+    }
+    [data-theme="light"]{
+      --bg:#f4f5f8;--bg1:#ffffff;--bg2:#eef0f4;--bg3:#e2e5ec;
+      --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
+      --text:#374151;--text-dim:#6b7280;--text-hi:#111827;
+      --amber:#d97706;--amber2:rgba(217,119,6,0.07);
+      --green:#059669;--blue:#2563eb;--purple:#7c3aed;--red:#dc2626;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+    /* NAV */
+    .pnav{position:sticky;top:0;z-index:100;background:rgba(10,11,14,0.93);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;height:52px;gap:0}
+    [data-theme="light"] .pnav{background:rgba(255,255,255,0.93)}
+    .pnav-brand{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber);letter-spacing:.06em;text-decoration:none;margin-right:auto}
+    .pnav-links{display:flex;gap:2px}
+    .pnav-link{font-family:var(--mono);font-size:11px;color:var(--text-dim);text-decoration:none;padding:5px 12px;border-radius:var(--r);transition:var(--t);letter-spacing:.04em}
+    .pnav-link:hover{color:var(--text-hi);background:var(--bg2)}
+    .pnav-link.ext{color:var(--amber)}
+    .theme-btn{margin-left:10px;padding:5px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:99px;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--text-dim);transition:var(--t)}
+    .theme-btn:hover{border-color:var(--amber);color:var(--amber)}
+    @media(max-width:640px){.pnav-links{display:none}}
+
+    /* LAYOUT */
+    .pcont{max-width:1140px;margin:0 auto;padding:0 32px}
+    @media(max-width:640px){.pcont{padding:0 16px}}
+
+    /* HERO */
+    .hero{padding:72px 0 56px;border-bottom:1px solid var(--border)}
+    .hero-eye{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+    .hero-eye::before{content:'';display:block;width:28px;height:1px;background:var(--amber)}
+    .hero-h{font-family:var(--serif);font-size:clamp(34px,5vw,58px);font-weight:800;color:var(--text-hi);line-height:1.1;letter-spacing:-.02em;margin-bottom:18px}
+    .hero-h span{color:var(--amber)}
+    .hero-sub{font-size:16px;color:var(--text-dim);max-width:560px;line-height:1.7;margin-bottom:36px}
+    .hero-meta{display:flex;gap:36px;flex-wrap:wrap}
+    .hm-item{display:flex;flex-direction:column;gap:3px}
+    .hm-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim)}
+    .hm-val{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text-hi)}
+    .hm-val.g{color:var(--green)}.hm-val.a{color:var(--amber)}
+
+    /* SECTIONS */
+    .section{padding:56px 0;border-bottom:1px solid var(--border)}
+    .section:last-of-type{border-bottom:none}
+    .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:32px}
+    .sec-num{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.1em}
+    .sec-title{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--text-hi);letter-spacing:-.01em}
+
+    /* METHOD GRID */
+    .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r3);overflow:hidden}
+    .mcard{background:var(--bg1);padding:22px}
+    .micon{font-size:20px;margin-bottom:10px;display:block}
+    .mlabel{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--amber);margin-bottom:5px}
+    .mtitle{font-size:15px;font-weight:500;color:var(--text-hi);margin-bottom:7px}
+    .mbody{font-size:13px;color:var(--text-dim);line-height:1.65}
+    .mbody code{font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--amber)}
+
+    /* STATS ROW */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;margin-bottom:28px}
+    .sc{background:var(--bg1);padding:18px 22px}
+    .sc-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim);margin-bottom:6px}
+    .sc-val{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text-hi);line-height:1}
+    .sc-sub{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px}
+
+    /* HUB CARDS */
+    .hub-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+    @media(max-width:800px){.hub-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:440px){.hub-grid{grid-template-columns:1fr}}
+    .hcard{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);padding:16px;position:relative;overflow:hidden;transition:border-color var(--t)}
+    .hcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--hub-color)}
+    .hcard:hover{border-color:var(--border2)}
+    .hcard-name{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:6px}
+    .hcard-acc{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1;margin-bottom:3px}
+    .hcard-mae{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+    .hcard-bar{height:3px;background:var(--bg3);border-radius:2px;margin-top:8px;overflow:hidden}
+    .hcard-bar-fill{height:100%;border-radius:2px;transition:width 1s ease;background:var(--hub-color)}
+
+    /* LOG BROWSER */
+    .log-browser{display:grid;grid-template-columns:240px 1fr;gap:0;border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;min-height:480px}
+    @media(max-width:760px){.log-browser{grid-template-columns:1fr}}
+    .log-sb{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;max-height:580px}
+    .log-sb-head{padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim);position:sticky;top:0;background:var(--bg1);z-index:1}
+    .log-item{padding:10px 14px;cursor:pointer;transition:background var(--t);border-bottom:1px solid var(--border);border-left:2px solid transparent}
+    .log-item:hover{background:var(--bg2)}
+    .log-item.active{background:var(--amber2);border-left-color:var(--amber)}
+    .log-item-date{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:2px}
+    .log-item-title{font-size:13px;color:var(--text-hi);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .log-detail{background:var(--bg);overflow-y:auto;max-height:580px}
+    .log-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:280px;gap:8px;color:var(--text-dim);font-family:var(--mono);font-size:12px;text-align:center;padding:24px}
+
+    /* LOG DETAIL */
+    .ld-inner{padding:24px}
+    .ld-date{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.1em}
+    .ld-title{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--text-hi);margin-bottom:14px;line-height:1.2}
+    .thesis-blk{background:var(--bg2);border-left:2px solid var(--amber);padding:12px 14px;border-radius:0 var(--r2) var(--r2) 0;margin-bottom:16px}
+    .thesis-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:var(--amber);margin-bottom:5px}
+    .thesis-txt{font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap}
+    .review-blk{background:var(--bg2);border-left:2px solid var(--green);padding:12px 14px;border-radius:0 var(--r2) var(--r2) 0;margin-bottom:16px}
+    .review-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:var(--green);margin-bottom:5px}
+
+    /* PRICE TABLE */
+    .hour-pills{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+    .hpill{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:99px;background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:var(--t)}
+    .hpill.active{background:var(--amber2);border-color:var(--amber);color:var(--amber);font-weight:600}
+    .tbl-wrap{overflow-x:auto}
+    .pmini{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+    .pmini th{padding:5px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);border-bottom:1px solid var(--border);background:var(--bg2)}
+    .pmini td{padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+    .pmini tr:last-child td{border-bottom:none}
+    .pmini tr:hover td{background:var(--bg2)}
+    .num{text-align:right}
+    .hcol{display:flex;align-items:center;gap:6px}
+    .hdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+    .p-neg{color:var(--blue)}.p-low{color:var(--green)}.p-mid{color:var(--amber)}.p-high{color:var(--red)}.p-spike{color:var(--purple);font-weight:700}
+    .ab{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 6px;border-radius:3px;border:1px solid}
+    .ab-great{color:var(--green);border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.08)}
+    .ab-good{color:#86efac;border-color:rgba(134,239,172,.3);background:rgba(134,239,172,.08)}
+    .ab-ok{color:var(--amber);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)}
+    .ab-poor{color:var(--red);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+    .ab-na{color:var(--text-dim);border-color:var(--border);background:transparent}
+    .dpos{color:var(--red)}.dneg{color:var(--green)}.dzero{color:var(--text-dim)}
+
+    /* MISC */
+    .tag-p{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:99px;border:1px solid;opacity:.85}
+    .skel{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:var(--r)}
+    @keyframes sk{0%{background-position:200%}100%{background-position:-200%}}
+    .pfooter{padding:36px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-dim);border-top:1px solid var(--border)}
+    .pfooter a{color:var(--amber);text-decoration:none}
+    .pfooter a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+
+<nav class="pnav">
+  <a class="pnav-brand" href="portfolio.html">KM / ERCOT</a>
+  <div class="pnav-links">
+    <a class="pnav-link" href="#methodology">Method</a>
+    <a class="pnav-link" href="#accuracy">Accuracy</a>
+    <a class="pnav-link" href="#log">Forecast Log</a>
+    <a class="pnav-link ext" href="index.html">Live Dashboard →</a>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="pcont">
+    <div class="hero-eye">Independent Research · ERCOT · Texas Power Markets</div>
+    <h1 class="hero-h">Day-Ahead LMP<br><span>Forecast Journal</span></h1>
+    <p class="hero-sub">
+      Daily price predictions across five ERCOT settlement hubs — energy component (system λ),
+      congestion, and total SPP forecast — tracked against settlement with structured reasoning on every call.
+    </p>
+    <div class="hero-meta">
+      <div class="hm-item"><span class="hm-label">Forecast Days</span><span class="hm-val a" id="s-days">—</span></div>
+      <div class="hm-item"><span class="hm-label">Overall Accuracy</span><span class="hm-val g" id="s-acc">—</span></div>
+      <div class="hm-item"><span class="hm-label">Mean Abs. Error</span><span class="hm-val" id="s-mae">—</span></div>
+      <div class="hm-item"><span class="hm-label">Graded Forecasts</span><span class="hm-val" id="s-n">—</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- METHODOLOGY -->
+<section class="section" id="methodology">
+  <div class="pcont">
+    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Methodology</h2></div>
+    <div class="mgrid">
+      <div class="mcard"><span class="micon">⚡</span><div class="mlabel">Price Structure</div><div class="mtitle">LMP Decomposition</div><div class="mbody">Each forecast decomposes settlement point price into <code>λ (energy + losses)</code> and <code>congestion</code>. System lambda is forecast once per hour slot and applied statewide; congestion is forecast per hub based on local topology and outage conditions.</div></div>
+      <div class="mcard"><span class="micon">🗺</span><div class="mlabel">Coverage</div><div class="mtitle">Five ERCOT Hubs</div><div class="mbody">Forecasts cover <code>HB_NORTH</code> (Dallas), <code>HB_HOUSTON</code>, <code>HB_SOUTH</code> (San Antonio), <code>HB_WEST</code> (Midland), and <code>HB_PAN</code> (Panhandle) at four daily hour slots: 7 AM, 12 PM, 5 PM, and 10 PM CPT.</div></div>
+      <div class="mcard"><span class="micon">☀️</span><div class="mlabel">Process</div><div class="mtitle">Morning Thesis First</div><div class="mbody">Each day begins with a written market thesis — wind outlook, demand forecast, temperature drivers, transmission outages — before any prices are entered. Reasoning is documented separately from the numbers.</div></div>
+      <div class="mcard"><span class="micon">📡</span><div class="mlabel">Data Sources</div><div class="mtitle">ERCOT CDR Reports</div><div class="mbody">DAM and RT settlement prices are pulled from ERCOT's CDR HTML reports via a local Node.js sync tool. The <code>Interval Ending :00</code> value is used as the HE representative price, matching ERCOT's dashboard display.</div></div>
+      <div class="mcard"><span class="micon">📐</span><div class="mlabel">Scoring</div><div class="mtitle">DAM-Relative Accuracy</div><div class="mbody">Score = 60% delta-based (anchored at $50/MWh reference) + 40% vs-DAM component. Beating the DAM directionally earns a bonus. Matching DAM scores ~50. Doing worse than DAM scores lower. Clamped 0–100.</div></div>
+      <div class="mcard"><span class="micon">🌙</span><div class="mlabel">Review</div><div class="mtitle">Evening Post-Mortem</div><div class="mbody">After RT settles, each day gets an evening review: what drove the market, where the thesis was right or wrong, what would have changed the call. Congestion accuracy tracked separately from energy.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ACCURACY -->
+<section class="section" id="accuracy">
+  <div class="pcont">
+    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">Track Record</h2></div>
+    <div class="stats-row" id="stats-row">
+      <div class="sc"><div class="sc-label">Loading</div><div class="skel" style="height:24px;margin-top:8px"></div></div>
+    </div>
+    <div class="hub-grid" id="hub-grid">
+      <!-- built by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- FORECAST LOG -->
+<section class="section" id="log">
+  <div class="pcont">
+    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Forecast Log</h2></div>
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:22px;max-width:540px">Browse daily entries to read the morning thesis, price predictions, and evening review. Each entry shows the reasoning chain — not just the numbers.</p>
+    <div class="log-browser">
+      <div class="log-sb">
+        <div class="log-sb-head">Recent Days</div>
+        <div id="log-list"><div style="padding:14px"><div class="skel" style="margin-bottom:10px"></div><div class="skel" style="margin-bottom:10px;width:70%"></div><div class="skel"></div></div></div>
+      </div>
+      <div class="log-detail" id="log-detail">
+        <div class="log-empty"><span style="font-size:22px;opacity:.2">←</span>Select a day to read the forecast</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="pfooter">
+  <div class="pcont">
+    <p>Kevin Maresca · Independent ERCOT Market Analysis · <a href="index.html">Live Dashboard →</a></p>
+    <p style="margin-top:5px;opacity:.45">Supabase · ERCOT CDR Data · Open-Meteo Weather · GitHub Pages</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/ui.js"></script>
+<script>
+// ── Theme ────────────────────────────────────────────────
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')||'dark';
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('et-theme',next);
+  document.getElementById('theme-btn').textContent=next==='light'?'🌙 Dark':'☀️ Light';
+}
+(function(){
+  const t=localStorage.getItem('et-theme')||'dark';
+  document.getElementById('theme-btn').textContent=t==='light'?'🌙 Dark':'☀️ Light';
+})();
+
+// ── Helpers ──────────────────────────────────────────────
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtP(v){
+  if(v===null||v===undefined)return'—';
+  const n=parseFloat(v);if(isNaN(n))return'—';
+  const tier=APP.priceTier(n);
+  const fmt=(n<0?'-$':'$')+Math.abs(n).toFixed(2);
+  return`<span class="p-${tier}">${fmt}</span>`;
+}
+function fmtAcc(n){
+  if(n===null||n===undefined)return'<span class="ab ab-na">—</span>';
+  const c=n>=90?'great':n>=75?'good':n>=55?'ok':'poor';
+  return`<span class="ab ab-${c}">${n}%</span>`;
+}
+function hdot(id){const h=APP.hubById(id);return`<span class="hdot" style="background:${h?.color??'#666'}"></span>`}
+function pcls(n){return n>=90?'great':n>=75?'good':n>=55?'ok':'poor'}
+
+// ── Stats ────────────────────────────────────────────────
+async function loadStats(){
+  const stats=await DB.getAccuracyStats({days:365});
+  document.getElementById('s-days').textContent=stats.sampleSize?Math.ceil(stats.sampleSize/20)+'+':('—');
+  document.getElementById('s-acc').textContent=stats.overall!==null?stats.overall+'%':'—';
+  document.getElementById('s-mae').textContent=stats.mae!==null?'$'+stats.mae.toFixed(2):'—';
+  document.getElementById('s-n').textContent=stats.sampleSize||'—';
+
+  document.getElementById('stats-row').innerHTML=`
+    <div class="sc"><div class="sc-label">Overall Accuracy</div><div class="sc-val" style="color:var(--green)">${stats.overall??'—'}${stats.overall!==null?'%':''}</div><div class="sc-sub">${stats.sampleSize} graded forecasts</div></div>
+    <div class="sc"><div class="sc-label">Mean Abs. Error</div><div class="sc-val">${stats.mae!==null?'$'+stats.mae.toFixed(2):'—'}</div><div class="sc-sub">$/MWh average miss</div></div>
+    <div class="sc"><div class="sc-label">Congestion Acc.</div><div class="sc-val">${stats.congestion!==null?stats.congestion+'%':'—'}</div><div class="sc-sub">${stats.congestionSampleSize||0} graded</div></div>
+    <div class="sc"><div class="sc-label">Scoring</div><div class="sc-val" style="font-size:14px;color:var(--amber)">DAM-Relative</div><div class="sc-sub">Beats DAM = bonus</div></div>`;
+
+  document.getElementById('hub-grid').innerHTML=APP.HUBS.map(hub=>{
+    const acc=stats.byHub[hub.id];
+    const mae=stats.maeByHub?.[hub.id];
+    const c=pcls(acc??0);
+    const col=acc>=90?'var(--green)':acc>=75?'#86efac':acc>=55?'var(--amber)':'var(--red)';
+    return`<div class="hcard" style="--hub-color:${hub.color}">
+      <div class="hcard-name">${hub.label}<br><span style="color:var(--text-dim);font-size:9px">${hub.city}</span></div>
+      <div class="hcard-acc" style="color:${acc!==undefined?col:'var(--text-dim)'}">${acc!==undefined?acc+'%':'—'}</div>
+      <div class="hcard-mae">${mae!==undefined?'MAE $'+mae.toFixed(2):''}</div>
+      <div class="hcard-bar"><div class="hcard-bar-fill" style="width:${acc??0}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Log list ─────────────────────────────────────────────
+let cache={};
+
+async function loadLog(){
+  const entries=await DB.listEntries({limit:30});
+  document.getElementById('s-days').textContent=entries.length||'—';
+  if(!entries.length){document.getElementById('log-list').innerHTML='<div style="padding:14px;color:var(--text-dim);font-size:12px">No entries yet.</div>';return}
+  document.getElementById('log-list').innerHTML=entries.map(e=>{
+    const tags=(e.tags||[]).slice(0,2).map(t=>{
+      const d=APP.TAGS.find(x=>x.value===t);
+      return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11;font-size:9px;padding:1px 5px">${d?.label??t}</span>`;
+    }).join(' ');
+    return`<div class="log-item" id="li-${e.entry_date}" onclick="openEntry('${e.entry_date}')">
+      <div class="log-item-date">${APP.fmtDateMed(e.entry_date)}</div>
+      <div class="log-item-title">${esc(e.title||'Untitled')}</div>
+      ${tags?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${tags}</div>`:''}
+    </div>`;
+  }).join('');
+  if(entries.length)openEntry(entries[0].entry_date);
+}
+
+async function openEntry(date){
+  document.querySelectorAll('.log-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`li-${date}`)?.classList.add('active');
+  const det=document.getElementById('log-detail');
+  det.innerHTML='<div style="padding:24px"><div class="skel" style="height:18px;margin-bottom:10px"></div><div class="skel" style="height:60px;margin-bottom:12px"></div><div class="skel" style="height:100px"></div></div>';
+  const [entry,forecasts]=await Promise.all([DB.getEntry(date),DB.getForecasts(date)]);
+  cache[date]=forecasts;
+  if(!entry&&!forecasts.length){det.innerHTML='<div class="log-empty">No data for this date</div>';return}
+
+  const graded=forecasts.filter(f=>f.actual_energy!==null&&f.pred_energy!==null);
+  const scores=graded.map(f=>{
+    const pt=(f.pred_energy!=null&&f.pred_congestion!=null)?f.pred_energy+f.pred_congestion:f.pred_energy;
+    return APP.accuracy(pt,f.actual_energy,f.dam_price);
+  }).filter(s=>s!==null);
+  const avgAcc=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+
+  const tags=(entry?.tags||[]).map(t=>{
+    const d=APP.TAGS.find(x=>x.value===t);
+    return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11">${d?.label??t}</span>`;
+  }).join(' ');
+
+  const activeSlot=APP.HOUR_SLOTS.find(s=>forecasts.some(f=>f.hour_slot===s))??APP.HOUR_SLOTS[0];
+
+  det.innerHTML=`
+    <div class="ld-inner">
+      <div class="ld-date">${APP.fmtDateLong(date)}</div>
+      <div class="ld-title">${esc(entry?.title||'Untitled')}</div>
+      ${tags?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${tags}</div>`:''}
+      ${avgAcc!==null?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">${fmtAcc(avgAcc)}<span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${scores.length} forecasts graded</span></div>`:''}
+      ${entry?.morning_thesis?`<div class="thesis-blk"><div class="thesis-lbl">☀️ Morning Thesis</div><div class="thesis-txt">${esc(entry.morning_thesis)}</div></div>`:''}
+      ${entry?.evening_review?`<div class="review-blk"><div class="review-lbl">🌙 Evening Review</div><div class="thesis-txt" style="color:var(--text)">${esc(entry.evening_review)}</div></div>`:''}
+      ${forecasts.length?`
+        <div>
+          <div class="hour-pills" id="hp-${date}"></div>
+          <div class="tbl-wrap" id="pt-${date}"></div>
+        </div>`:''}
+    </div>`;
+
+  if(forecasts.length){
+    renderTable(date,forecasts,activeSlot);
+    document.getElementById(`hp-${date}`).innerHTML=
+      APP.HOUR_SLOTS.filter(s=>forecasts.some(f=>f.hour_slot===s)).map(s=>
+        `<span class="hpill ${s===activeSlot?'active':''}" onclick="sw(this,'${date}',${s})">${APP.fmtHour(s)}</span>`
+      ).join('');
+  }
+}
+
+function sw(pill,date,slot){
+  document.querySelectorAll(`#hp-${date} .hpill`).forEach(p=>p.classList.remove('active'));
+  pill.classList.add('active');
+  renderTable(date,cache[date]||[],slot);
+}
+
+function renderTable(date,forecasts,slot){
+  const rows=forecasts.filter(f=>f.hour_slot===slot);
+  const el=document.getElementById(`pt-${date}`);
+  if(!el)return;
+  if(!rows.length){el.innerHTML=`<p style="color:var(--text-dim);font-size:12px">No data for ${APP.fmtHour(slot)}</p>`;return}
+  const hasAct=rows.some(f=>f.actual_energy!==null);
+  let h=`<table class="pmini"><thead><tr>
+    <th>Hub</th>
+    <th class="num" style="color:var(--blue)">DAM</th>
+    <th class="num" style="color:var(--amber)">λ</th>
+    <th class="num" style="color:var(--purple)">Cong</th>
+    <th class="num" style="color:var(--amber);font-weight:600">=Total</th>
+    ${hasAct?'<th class="num" style="color:var(--green)">Actual RT</th><th class="num">Δ</th><th>Acc</th>':''}
+  </tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const hub=APP.hubById(r.hub);
+    const pt=(r.pred_energy!=null&&r.pred_congestion!=null)?r.pred_energy+r.pred_congestion:r.pred_energy;
+    const act=r.actual_energy;
+    const d=(act!==null&&pt!==null)?act-pt:null;
+    const dEl=d!==null?`<span class="d${d>0?'pos':d<0?'neg':'zero'}">${d>0?'+':''}${d.toFixed(2)}</span>`:'—';
+    const acc=(act!==null&&pt!==null)?APP.accuracy(pt,act,r.dam_price):null;
+    h+=`<tr>
+      <td><div class="hcol">${hdot(r.hub)}<span style="color:var(--text-hi)">${hub?.label??r.hub}</span></div></td>
+      <td class="num">${fmtP(r.dam_price)}</td>
+      <td class="num">${fmtP(r.pred_energy)}</td>
+      <td class="num">${r.pred_congestion!=null?fmtP(r.pred_congestion):'<span style="color:var(--text-dim)">—</span>'}</td>
+      <td class="num" style="font-weight:700">${fmtP(pt)}</td>
+      ${hasAct?`<td class="num">${act!==null?fmtP(act):'<span style="color:var(--text-dim)">—</span>'}</td><td class="num">${dEl}</td><td>${fmtAcc(acc)}</td>`:''}
+    </tr>`;
+    if(r.pred_notes)h+=`<tr><td colspan="${hasAct?8:5}" style="color:var(--text-dim);font-size:11px;padding:2px 8px 8px;font-style:italic">↳ ${esc(r.pred_notes)}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+// ── Boot ─────────────────────────────────────────────────
+Promise.all([loadStats(),loadLog()]);
+</script>
+</body>
+</html>

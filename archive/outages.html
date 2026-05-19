@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Outages — Energy Trader</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('et-theme')||'dark');</script>
+  <style>
+    .ow          { max-width:1400px; margin:0 auto; padding:18px 24px 52px; }
+    .ow-top      { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+                   margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+    .ow-title    { font-family:var(--font-display); font-size:20px; font-weight:700;
+                   color:var(--text-hi); letter-spacing:-.02em; }
+    .ow-eyebrow  { font-family:var(--font-mono); font-size:9px; text-transform:uppercase;
+                   letter-spacing:.15em; color:var(--amber); margin-bottom:3px; }
+    /* badges */
+    .sb  { font-family:var(--font-mono); font-size:10px; padding:4px 10px; border-radius:var(--r);
+           border:1px solid var(--border); color:var(--text-faint);
+           display:flex; align-items:center; gap:5px; }
+    .sd  { width:6px; height:6px; border-radius:50%; background:var(--text-faint); flex-shrink:0; }
+    .sb.ok  .sd  { background:var(--green); box-shadow:0 0 5px var(--green); }
+    .sb.err .sd  { background:var(--red); }
+    .sb.loading .sd { background:var(--amber); animation:blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    /* quick-links */
+    .ql      { display:flex; gap:7px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+    .ql-pill { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono);
+               font-size:10px; padding:4px 9px; border-radius:var(--r);
+               background:rgba(245,166,35,.06); border:1px solid rgba(245,166,35,.25);
+               color:var(--amber); text-decoration:none; transition:var(--t); }
+    .ql-pill:hover { background:rgba(245,166,35,.14); }
+    /* layout */
+    .ow-grid { display:grid; grid-template-columns:1fr 360px; gap:14px; align-items:start; }
+    @media(max-width:1080px){ .ow-grid { grid-template-columns:1fr; } }
+    /* cards */
+    .oc    { background:var(--bg1); border:1px solid var(--border); border-radius:var(--r3);
+             overflow:hidden; margin-bottom:12px; }
+    .oc:last-child { margin-bottom:0; }
+    .oc-hd { background:var(--bg2); border-bottom:1px solid var(--border); padding:9px 14px;
+             display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .oc-hd-t { font-family:var(--font-mono); font-size:9px; font-weight:500;
+               text-transform:uppercase; letter-spacing:.12em; color:var(--text-dim); }
+    /* stat strip */
+    .ss      { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); }
+    .ss-cell { background:var(--bg2); padding:10px 14px; text-align:center; }
+    .ss-lbl  { font-family:var(--font-mono); font-size:8px; text-transform:uppercase;
+               letter-spacing:.1em; color:var(--text-faint); margin-bottom:4px; }
+    .ss-val  { font-family:var(--font-mono); font-size:20px; font-weight:600; }
+    .ss-sub  { font-family:var(--font-mono); font-size:9px; color:var(--text-faint); margin-top:2px; }
+    /* system conditions */
+    .sc-row  { display:flex; gap:1px; background:var(--border); }
+    .sc-cell { flex:1; background:var(--bg2); padding:8px 12px; min-width:0; }
+    .sc-lbl  { font-family:var(--font-mono); font-size:8px; text-transform:uppercase;
+               letter-spacing:.1em; color:var(--text-faint); margin-bottom:3px; }
+    .sc-val  { font-family:var(--font-mono); font-size:14px; font-weight:600; color:var(--text); }
+    /* leaflet */
+    #ogMap { width:100%; height:500px; display:block;
+             border-radius:0 0 var(--r3) var(--r3); }
+    [data-theme="dark"] .leaflet-tile-pane {
+      filter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.92) saturate(.8); }
+    [data-theme="dark"] .leaflet-container { background:#0c0e12; }
+    [data-theme="dark"] .leaflet-popup-content-wrapper {
+      background:var(--bg2); border:1px solid var(--border2); color:var(--text);
+      border-radius:var(--r2); box-shadow:0 4px 24px rgba(0,0,0,.7); }
+    [data-theme="dark"] .leaflet-popup-tip { background:var(--bg2); }
+    [data-theme="dark"] .leaflet-popup-close-button { color:var(--text-faint) !important; }
+    [data-theme="dark"] .leaflet-control-zoom a {
+      background:var(--bg2); color:var(--text); border-color:var(--border2); }
+    .leaflet-popup-content { margin:10px 14px; font-size:12px; line-height:1.7; font-family:var(--font-body); }
+    .leaflet-popup-content b { color:var(--text-hi); }
+    /* map legend overlay */
+    .map-leg { position:absolute; bottom:14px; right:10px; z-index:900;
+               background:rgba(17,19,24,.93); border:1px solid var(--border2);
+               border-radius:var(--r2); padding:9px 12px; pointer-events:none; }
+    .ml-hd  { font-family:var(--font-mono); font-size:8px; text-transform:uppercase;
+              letter-spacing:.1em; color:var(--text-faint); margin-bottom:6px; }
+    .ml-row { display:flex; align-items:center; gap:6px; color:var(--text-dim);
+              font-family:var(--font-mono); font-size:10px; margin-bottom:3px; }
+    .ml-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    /* tabs */
+    .tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; }
+    .tab  { font-family:var(--font-mono); font-size:10px; padding:8px 14px; color:var(--text-faint);
+            cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+            transition:color var(--t); white-space:nowrap; flex-shrink:0; }
+    .tab:hover  { color:var(--text); }
+    .tab.active { color:var(--amber); border-bottom-color:var(--amber); }
+    .pane { display:none; }
+    .pane.active { display:block; }
+    /* charts */
+    .ch-area  { padding:14px; }
+    .ch-label { font-family:var(--font-mono); font-size:9px; text-transform:uppercase;
+                letter-spacing:.1em; color:var(--text-faint); margin-bottom:10px; }
+    .bar-chart { display:flex; align-items:flex-end; gap:2px; height:130px;
+                 border-bottom:1px solid var(--border); }
+    .bc-bar   { flex:1; min-width:3px; cursor:pointer; border-radius:1px 1px 0 0; }
+    .bc-bar:hover { filter:brightness(1.3); }
+    .x-labels { display:flex; gap:2px; margin-top:4px; }
+    .x-lbl    { flex:1; font-family:var(--font-mono); font-size:7px; color:var(--text-faint);
+                text-align:center; overflow:hidden; min-width:3px; }
+    .ch-legend { display:flex; gap:14px; margin-top:8px; flex-wrap:wrap; }
+    .cl-item  { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--text-dim); }
+    .cl-sw    { width:10px; height:10px; border-radius:2px; }
+    /* 168hr stacked bars */
+    .fwd-chart { display:flex; align-items:flex-end; gap:2px; height:130px;
+                 border-bottom:1px solid var(--border); }
+    .fwd-bar  { flex:1; min-width:4px; cursor:pointer; position:relative; }
+    .fwd-bar:hover { filter:brightness(1.3); }
+    .seg-th   { position:absolute; bottom:0; left:0; right:0;
+                background:rgba(248,113,113,.75); border-radius:1px 1px 0 0; }
+    .seg-irr  { position:absolute; left:0; right:0;
+                background:rgba(52,211,153,.5); border-radius:1px 1px 0 0; }
+    /* zone cards */
+    .zone-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:12px 14px; }
+    .zone-card { background:var(--bg3); border:1px solid var(--border);
+                 border-radius:var(--r2); padding:10px 12px; }
+    .z-name   { font-family:var(--font-mono); font-size:8px; text-transform:uppercase;
+                letter-spacing:.1em; color:var(--text-faint); margin-bottom:5px; }
+    .z-th     { font-family:var(--font-mono); font-size:15px; font-weight:600; }
+    .z-irr    { font-family:var(--font-mono); font-size:11px; color:var(--green); margin-top:2px; }
+    /* data table */
+    .dt    { width:100%; border-collapse:collapse; font-size:11px; }
+    .dt th { font-family:var(--font-mono); font-size:8px; text-transform:uppercase;
+             letter-spacing:.1em; color:var(--text-faint); padding:6px 10px;
+             border-bottom:1px solid var(--border); font-weight:500; text-align:left; }
+    .dt th.r,.dt td.r { text-align:right; }
+    .dt td { padding:7px 10px; border-bottom:1px solid var(--border);
+             font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
+    .dt tr:last-child td { border-bottom:none; }
+    .dt tr:hover td { background:var(--bg2); }
+    .dt td strong { color:var(--text); font-weight:500; }
+    .dt-wrap { overflow-y:auto; max-height:300px; }
+    /* type badges */
+    .tb   { font-family:var(--font-mono); font-size:9px; padding:2px 6px; border-radius:3px;
+            display:inline-block; white-space:nowrap; }
+    .tb-f { background:rgba(248,113,113,.14); color:var(--red);    border:1px solid rgba(248,113,113,.3); }
+    .tb-p { background:rgba(96,165,250,.12);  color:var(--blue);   border:1px solid rgba(96,165,250,.25); }
+    .tb-m { background:rgba(245,166,35,.12);  color:var(--amber);  border:1px solid rgba(245,166,35,.25); }
+    .tb-t { background:rgba(167,139,250,.12); color:var(--purple); border:1px solid rgba(167,139,250,.25); }
+    .tb-r { background:rgba(52,211,153,.12);  color:var(--green);  border:1px solid rgba(52,211,153,.25); }
+    /* MW colors */
+    .mw-hi  { color:var(--red); }
+    .mw-med { color:var(--amber); }
+    .mw-lo  { color:var(--text-dim); }
+    .mw-ok  { color:var(--green); }
+    /* key-hour rows */
+    .kh-row { display:flex; justify-content:space-between; align-items:baseline;
+              padding:6px 0; border-bottom:1px solid var(--border); }
+    .kh-row:last-child { border-bottom:none; }
+    /* spin */
+    .spin { width:14px; height:14px; border-radius:50%;
+            border:2px solid var(--border2); border-top-color:var(--amber);
+            display:inline-block; animation:rot .9s linear infinite; flex-shrink:0; }
+    @keyframes rot { to { transform:rotate(360deg); } }
+    /* notices */
+    .info-n { background:rgba(96,165,250,.06); border:1px solid rgba(96,165,250,.2);
+              border-left:3px solid var(--blue); border-radius:var(--r2);
+              padding:8px 12px; font-size:11px; color:var(--text-dim); line-height:1.6; }
+    .warn-n { background:rgba(245,166,35,.06); border:1px solid rgba(245,166,35,.2);
+              border-left:3px solid var(--amber); border-radius:var(--r2);
+              padding:8px 12px; font-size:11px; color:var(--text-dim); line-height:1.6; }
+    /* log */
+    .og-log { background:var(--bg); border:1px solid var(--border); border-radius:var(--r2);
+              padding:8px 10px; height:100px; overflow-y:auto;
+              font-family:var(--font-mono); font-size:10px; line-height:1.65; }
+    .lg-ok { color:var(--green); }
+    .lg-w  { color:var(--amber); }
+    .lg-e  { color:var(--red); }
+    .lg-d  { color:var(--text-faint); }
+    /* CSV textarea */
+    .csv-ta { resize:vertical; width:100%; height:56px; font-size:11px;
+              font-family:var(--font-mono); background:var(--bg3);
+              border:1px solid var(--border2); color:var(--text);
+              border-radius:var(--r); padding:6px 8px; box-sizing:border-box; }
+    /* right col */
+    .right-col { display:flex; flex-direction:column; gap:12px; position:sticky; top:70px; }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-brand" href="index.html">Energy<span class="nav-brand-dot">.</span>Trader</a>
+  <ul class="nav-links">
+    <li><a href="index.html">Dashboard</a></li>
+    <li><a href="review.html">Review</a></li>
+    <li><a href="notes.html">Notes</a></li>
+    <li><a href="admin-lEqo0dka.html">Admin</a></li>
+    <li><a href="lambda.html">λ Predictor</a></li>
+    <li><a href="outages.html" class="active">Outages</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <span class="theme-toggle-icon" id="ti">☀️</span><span id="tl">Light</span>
+    </button>
+  </div>
+</nav>
+
+<div class="page"><div class="ow">
+
+  <!-- topbar -->
+  <div class="ow-top">
+    <div>
+      <div class="ow-eyebrow">Admin · Support Tool</div>
+      <div class="ow-title">ERCOT Outage Monitor</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;">
+      <div class="sb" id="sb_gen"><span class="sd"></span><span id="sbt_gen">Gen outages</span></div>
+      <div class="sb" id="sb_sys"><span class="sd"></span><span id="sbt_sys">System conditions</span></div>
+      <div class="sb" id="sb_168"><span class="sd"></span><span id="sbt_168">168hr capacity</span></div>
+      <span class="spin" id="sp" style="display:none"></span>
+      <span id="lastUpd" style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)"></span>
+      <button class="btn btn-primary btn-sm" onclick="refreshAll(true)">⟳ Refresh All</button>
+    </div>
+  </div>
+
+  <!-- quick links -->
+  <div class="ql">
+    <span style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)">Sources →</span>
+    <a class="ql-pill" href="https://www.ercot.com/gridmktinfo/dashboards/generationoutages" target="_blank">Gen Outages ↗</a>
+    <a class="ql-pill" href="https://www.ercot.com/mp/data-products/data-product-details?id=NP3-233-CD" target="_blank">NP3-233-CD (168hr) ↗</a>
+    <a class="ql-pill" href="https://www.ercot.com/mp/data-products/data-product-details?id=NP1-346-ER" target="_blank">NP1-346-ER (Unplanned) ↗</a>
+    <a class="ql-pill" href="https://www.ercot.com/gridinfo/transmission" target="_blank">Tx Outages ↗</a>
+    <a class="ql-pill" href="https://www.ercot.com/content/cdr/html/real_time_system_conditions.html" target="_blank">RT System Conditions ↗</a>
+    <a class="ql-pill" href="https://www.ercot.com/content/cdr/html/dam_spp.html" target="_blank">DAM SPP ↗</a>
+  </div>
+
+  <!-- stat strip -->
+  <div class="oc" style="margin-bottom:14px;">
+    <div class="ss" id="statStrip">
+      <div class="ss-cell">
+        <div class="ss-lbl">Dispatchable Offline</div>
+        <div class="ss-val" id="st_disp">—</div>
+        <div class="ss-sub">forced + planned MW</div>
+      </div>
+      <div class="ss-cell">
+        <div class="ss-lbl">Forced / Unplanned</div>
+        <div class="ss-val mw-hi" id="st_forced">—</div>
+        <div class="ss-sub" id="st_forced_sub">now</div>
+      </div>
+      <div class="ss-cell">
+        <div class="ss-lbl">Planned</div>
+        <div class="ss-val mw-med" id="st_planned">—</div>
+        <div class="ss-sub">scheduled</div>
+      </div>
+      <div class="ss-cell">
+        <div class="ss-lbl">Renewable Offline</div>
+        <div class="ss-val mw-ok" id="st_renew">—</div>
+        <div class="ss-sub">IRR outages</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- system conditions -->
+  <div class="oc" style="margin-bottom:14px;">
+    <div class="oc-hd">
+      <span class="oc-hd-t">RT System Conditions</span>
+      <span id="sc_upd" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint)"></span>
+    </div>
+    <div class="sc-row">
+      <div class="sc-cell"><div class="sc-lbl">Actual Demand</div><div class="sc-val" id="sc_dem">—</div></div>
+      <div class="sc-cell"><div class="sc-lbl">Total Capacity</div><div class="sc-val" id="sc_cap">—</div></div>
+      <div class="sc-cell"><div class="sc-lbl">Reserve Margin</div><div class="sc-val" id="sc_rsv">—</div></div>
+      <div class="sc-cell"><div class="sc-lbl">Wind Output</div><div class="sc-val" id="sc_wnd">—</div></div>
+      <div class="sc-cell"><div class="sc-lbl">Solar Output</div><div class="sc-val" id="sc_sol">—</div></div>
+      <div class="sc-cell"><div class="sc-lbl">Frequency</div><div class="sc-val" id="sc_frq">—</div></div>
+    </div>
+  </div>
+
+  <!-- 2-col grid -->
+  <div class="ow-grid">
+
+    <!-- LEFT -->
+    <div>
+      <!-- MAP -->
+      <div class="oc">
+        <div class="oc-hd">
+          <span class="oc-hd-t">Generation Outage Map · Zone-Level MW</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span id="mapTs" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint)"></span>
+            <select id="mapFil" onchange="applyFilter()"
+              style="font-family:var(--font-mono);font-size:9px;padding:3px 7px;height:auto;">
+              <option value="all">All outages</option>
+              <option value="forced">Forced only</option>
+              <option value="planned">Planned only</option>
+              <option value="renew">Renewables only</option>
+            </select>
+          </div>
+        </div>
+        <div style="position:relative;">
+          <div id="ogMap"></div>
+          <div class="map-leg">
+            <div class="ml-hd">Outage Type</div>
+            <div class="ml-row"><span class="ml-dot" style="background:#ef4444;border:2px solid #fca5a5"></span>Forced/Unplanned</div>
+            <div class="ml-row"><span class="ml-dot" style="background:#3b82f6;border:2px solid #93c5fd"></span>Planned/Scheduled</div>
+            <div class="ml-row"><span class="ml-dot" style="background:#10b981;border:2px solid #6ee7b7"></span>Renewable (IRR)</div>
+            <div class="ml-row"><span class="ml-dot" style="background:#8b5cf6;border:2px solid #c4b5fd"></span>Transmission</div>
+            <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border2);
+                        font-family:var(--font-mono);font-size:8px;color:var(--text-faint)">Radius ∝ MW offline</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="oc">
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('live',this)">Today Live</div>
+          <div class="tab" onclick="switchTab('t168',this)">168hr Forward</div>
+          <div class="tab" onclick="switchTab('zones',this)">Zone Breakdown</div>
+          <div class="tab" onclick="switchTab('kh',this)">Key Hour Slots</div>
+          <div class="tab" onclick="switchTab('src',this)">Data Sources</div>
+        </div>
+
+        <!-- TODAY LIVE -->
+        <div class="pane active" id="pane_live">
+          <div class="ch-area">
+            <div class="ch-label">Today · Dispatchable outages per 5-min interval (MW)</div>
+            <div class="bar-chart" id="liveChart"></div>
+            <div class="x-labels" id="liveX"></div>
+            <div class="ch-legend">
+              <div class="cl-item"><div class="cl-sw" style="background:rgba(248,113,113,.8)"></div>Forced/Unplanned</div>
+              <div class="cl-item"><div class="cl-sw" style="background:rgba(96,165,250,.6)"></div>Planned</div>
+              <div class="cl-item" style="margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--text-faint)" id="liveMeta"></div>
+            </div>
+            <div class="info-n" style="margin-top:10px;font-size:10px;">
+              Source: <strong style="color:var(--blue)">generation-outages.json</strong>
+              — ERCOT public dashboard API. No auth, CORS-enabled, 5-min cadence. Today + 6 prior days.
+            </div>
+          </div>
+        </div>
+
+        <!-- 168hr FORWARD -->
+        <div class="pane" id="pane_t168">
+          <div class="ch-area">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+              <div class="ch-label" style="margin-bottom:0">NP3-233-CD · 168hr forward by zone (MW)</div>
+              <span id="s168meta" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint)"></span>
+            </div>
+            <div class="fwd-chart" id="chart168"></div>
+            <div class="x-labels" id="x168"></div>
+            <div class="ch-legend" style="margin-top:8px;">
+              <div class="cl-item"><div class="cl-sw" style="background:rgba(248,113,113,.75)"></div>Thermal (non-IRR)</div>
+              <div class="cl-item"><div class="cl-sw" style="background:rgba(52,211,153,.5)"></div>IRR (Renewable)</div>
+            </div>
+            <div class="warn-n" style="margin-top:10px;font-size:10px;">
+              <strong style="color:var(--amber)">NP3-233-CD</strong> requires MIS login for direct download.
+              Auto-fetch via CORS proxy is attempted on every refresh. If blocked, download from
+              <a href="https://www.ercot.com/mp/data-products/data-product-details?id=NP3-233-CD"
+                 target="_blank" style="color:var(--amber)">data product page ↗</a>
+              and paste the CSV content here:
+              <div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+                <textarea id="csvPaste" class="csv-ta" placeholder="Paste NP3-233-CD CSV content here…"></textarea>
+                <button class="btn btn-ghost btn-sm" onclick="parsePasted()" style="flex-shrink:0">Parse CSV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZONE BREAKDOWN -->
+        <div class="pane" id="pane_zones">
+          <div class="zone-grid" id="zoneGrid">
+            <div class="zone-card"><div class="z-name">North</div><div class="z-th" id="zt_north">—</div><div class="z-irr" id="zi_north">— IRR</div></div>
+            <div class="zone-card"><div class="z-name">Houston</div><div class="z-th" id="zt_houston">—</div><div class="z-irr" id="zi_houston">— IRR</div></div>
+            <div class="zone-card"><div class="z-name">South</div><div class="z-th" id="zt_south">—</div><div class="z-irr" id="zi_south">— IRR</div></div>
+            <div class="zone-card"><div class="z-name">West</div><div class="z-th" id="zt_west">—</div><div class="z-irr" id="zi_west">— IRR</div></div>
+          </div>
+          <div style="padding:0 14px 14px;">
+            <div class="dt-wrap">
+              <table class="dt">
+                <thead><tr>
+                  <th>Hour (CPT)</th>
+                  <th class="r">North</th><th class="r">Houston</th>
+                  <th class="r">South</th><th class="r">West</th>
+                  <th class="r">Thermal Total</th><th class="r">IRR Total</th>
+                </tr></thead>
+                <tbody id="zoneTbody">
+                  <tr><td colspan="7" style="text-align:center;padding:16px;color:var(--text-faint)">Load 168hr data first →</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- KEY HOUR SLOTS -->
+        <div class="pane" id="pane_kh">
+          <div style="padding:14px;">
+            <div class="info-n" style="margin-bottom:12px;font-size:10px;">
+              Thermal MW offline at your four forecast slots for today and D+1.
+              The λ Adj. column is an additive signal on top of your merit-order lambda.
+            </div>
+            <table class="dt" id="khTable">
+              <thead><tr>
+                <th>Slot</th><th>Day</th>
+                <th class="r">North</th><th class="r">Houston</th>
+                <th class="r">South</th><th class="r">West</th>
+                <th class="r">Total Thermal</th><th class="r">λ Adj.</th>
+              </tr></thead>
+              <tbody id="khTbody">
+                <tr><td colspan="8" style="text-align:center;padding:16px;color:var(--text-faint)">Load 168hr data first →</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- DATA SOURCES -->
+        <div class="pane" id="pane_src">
+          <div style="padding:14px;font-size:11px;color:var(--text-dim);">
+            <table class="dt">
+              <thead><tr><th>Source</th><th>Access</th><th>What it gives you</th><th>Cadence</th></tr></thead>
+              <tbody>
+                <tr><td><strong>generation-outages.json</strong></td><td><span class="tb tb-r">Live · No auth</span></td>
+                  <td>5-min MW totals · planned vs forced · dispatchable vs IRR · 6-day history. Auto-fetched here.</td><td>5 min</td></tr>
+                <tr><td><strong>NP3-233-CD</strong><br><span style="color:var(--text-faint);font-size:10px">Hourly Resource Outage Capacity</span></td><td><span class="tb tb-m">CSV · MIS proxy</span></td>
+                  <td>168hr forward by zone. Cols C–F = thermal. Cols G–J = IRR. Best D+1 thermal gap signal.</td><td>Hourly</td></tr>
+                <tr><td><strong>NP1-346-ER</strong><br><span style="color:var(--text-faint);font-size:10px">Unplanned Outages</span></td><td><span class="tb tb-p">MIS login req.</span></td>
+                  <td>Individual plant names + MW + type + estimated return. Use when lambda spikes unexpectedly.</td><td>~5am D+3</td></tr>
+                <tr><td><strong>RT System Conditions</strong></td><td><span class="tb tb-r">CORS proxy</span></td>
+                  <td>Demand, capacity, reserves, wind, solar, frequency. Auto-fetched here.</td><td>~10 min</td></tr>
+                <tr><td><strong>gridinfo/transmission</strong></td><td><span class="tb tb-t">CORS proxy</span></td>
+                  <td>Proposed/approved Tx outages. Explains West & Panhandle congestion premiums.</td><td>As submitted</td></tr>
+                <tr><td><strong>SCED Shadow Prices (NP6-86-CD)</strong></td><td><span class="tb tb-p">MIS auth req.</span></td>
+                  <td>Which transmission elements bound + shadow price. Best retroactive congestion miss explainer.</td><td>Every SCED</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /tabs -->
+    </div><!-- /left -->
+
+    <!-- RIGHT -->
+    <div class="right-col">
+
+      <!-- auto-refresh -->
+      <div class="oc">
+        <div class="oc-hd"><span class="oc-hd-t">Auto-Refresh</span></div>
+        <div style="padding:12px 14px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <label style="font-size:12px;color:var(--text-dim);white-space:nowrap">Interval:</label>
+            <select id="rifSel" onchange="setAutoRefresh()"
+              style="font-family:var(--font-mono);font-size:11px;padding:4px 8px;height:auto;flex:1">
+              <option value="0">Manual only</option>
+              <option value="300000">5 minutes</option>
+              <option value="900000" selected>15 minutes</option>
+              <option value="1800000">30 minutes</option>
+              <option value="3600000">1 hour</option>
+            </select>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);line-height:1.9">
+            <div>Last: <span id="lastTs">—</span></div>
+            <div>Next: <span id="nextTs">—</span></div>
+          </div>
+          <div class="info-n" style="margin-top:10px;font-size:10px;">
+            Live gen data + RT conditions auto-fetch on schedule.
+            168hr CSV needs manual paste or MIS login — check each morning before Admin entry.
+          </div>
+        </div>
+      </div>
+
+      <!-- λ impact guide -->
+      <div class="oc">
+        <div class="oc-hd"><span class="oc-hd-t">Thermal Gap → λ Impact</span></div>
+        <div style="padding:12px 14px;font-size:11px;color:var(--text-dim);line-height:1.7;">
+          <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+                      letter-spacing:.1em;color:var(--amber);margin-bottom:8px;">MW Offline → Additive λ Signal</div>
+          <div class="kh-row"><span>&lt;5,000 MW</span><span class="mw-ok" style="font-family:var(--font-mono);font-size:11px">Minimal</span></div>
+          <div class="kh-row"><span>5–10 GW</span><span class="mw-lo" style="font-family:var(--font-mono);font-size:11px">+$1–5/MWh</span></div>
+          <div class="kh-row"><span>10–20 GW</span><span class="mw-med" style="font-family:var(--font-mono);font-size:11px">+$5–15/MWh</span></div>
+          <div class="kh-row"><span>20–30 GW</span><span class="mw-hi" style="font-family:var(--font-mono);font-size:11px">+$15–30/MWh</span></div>
+          <div class="kh-row" style="border-bottom:none"><span>&gt;30 GW</span><span class="mw-hi" style="font-family:var(--font-mono);font-size:11px">Spike risk ⚡</span></div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);
+                      font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+                      letter-spacing:.1em;color:var(--amber);margin-bottom:6px">Tx Outages → Congestion</div>
+          <div style="font-size:10px;">Any approved 345kV outage in West TX or Panhandle = potential +$5–40 congestion premium at HB_WEST or HB_PAN. Check gridinfo/transmission every morning.</div>
+        </div>
+      </div>
+
+      <!-- live zone snapshot -->
+      <div class="oc">
+        <div class="oc-hd"><span class="oc-hd-t">Live Zone Snapshot</span></div>
+        <div style="padding:12px 14px;" id="zoneSnap">
+          <div style="text-align:center;padding:12px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px">Refresh to load</div>
+        </div>
+      </div>
+
+      <!-- log -->
+      <div class="oc">
+        <div class="oc-hd"><span class="oc-hd-t">Fetch Log</span></div>
+        <div style="padding:8px;">
+          <div class="og-log" id="logArea">
+            <div class="lg-d">[ERCOT Outage Monitor · Energy.Trader]</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /ow-grid -->
+</div></div><!-- /ow /page -->
+
+<footer class="site-footer">
+  © <span id="yr"></span> · Kevin Maresca &nbsp;·&nbsp;
+  <span style="color:var(--text-faint)">Outage Monitor · Admin Tool</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script>
+'use strict';
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* ═══════════════════════════════════════════════════════════════
+   CONSTANTS — all confirmed working or proxied
+═══════════════════════════════════════════════════════════════ */
+// ✅ CORS-free, no auth, 5-min data
+const API_GEN  = 'https://www.ercot.com/api/1/services/read/dashboards/generation-outages.json';
+// ✅ CORS-free, no auth, real-time reserve data
+const API_PRC  = 'https://www.ercot.com/api/1/services/read/dashboards/daily-prc.json';
+// Proxied (HTML table parse)
+const API_SYS  = 'https://www.ercot.com/content/cdr/html/real_time_system_conditions.html';
+// Proxied (MIS CSV listing)
+const MIS_168  = 'https://mis.ercot.com/misapp/GetReports.do?reportTypeId=13103&reportTitle=Hourly+Resource+Outage+Capacity&showHTMLView=&mimicKey=';
+// CORS proxies — try in order
+const PROXIES  = [
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+];
+
+const HUBS = window.APP?.HUBS || [
+  {id:'HB_NORTH',   label:'North',     lat:32.78,  lon:-96.80,  color:'#3b82f6'},
+  {id:'HB_HOUSTON', label:'Houston',   lat:29.76,  lon:-95.37,  color:'#f59e0b'},
+  {id:'HB_SOUTH',   label:'South',     lat:29.42,  lon:-98.49,  color:'#10b981'},
+  {id:'HB_WEST',    label:'West',      lat:31.99,  lon:-102.08, color:'#ef4444'},
+  {id:'HB_PAN',     label:'Panhandle', lat:35.22,  lon:-101.83, color:'#8b5cf6'},
+];
+
+// Approx centroids for zone outage circles (slightly offset from hub labels)
+const ZONE_POS = {
+  North:   [32.90, -96.50],
+  Houston: [29.55, -94.90],
+  South:   [29.10, -98.20],
+  West:    [31.50, -102.60],
+};
+
+// Historical zone share of ERCOT-wide thermal outages (proxy when NP3-233-CD unavailable)
+const ZONE_SPLIT = {North:0.30, Houston:0.22, South:0.18, West:0.20, Pan:0.10};
+
+const SLOTS = [{h:7,lbl:'7am'},{h:12,lbl:'12pm'},{h:17,lbl:'5pm'},{h:22,lbl:'10pm'}];
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let genData  = null;
+let data168  = null;
+let autoTmr  = null;
+let nxtRef   = null;
+let leafMap  = null;
+let markers  = [];   // [{m, type}]
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════════════════ */
+function log(msg, t='d') {
+  const a = document.getElementById('logArea');
+  const ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  const el = document.createElement('div');
+  el.className = `lg-${t}`;
+  el.textContent = `[${ts}] ${msg}`;
+  a.appendChild(el);
+  a.scrollTop = a.scrollHeight;
+}
+function setSB(id, txtId, state, text) {
+  document.getElementById(id).className = `sb ${state}`;
+  document.getElementById(txtId).textContent = text;
+}
+function fmtMW(n) {
+  if (n == null || isNaN(n) || n === 0) return '—';
+  return Math.round(n).toLocaleString() + ' MW';
+}
+function mwCls(n) {
+  return n > 25000 ? 'mw-hi' : n > 10000 ? 'mw-med' : n > 5000 ? 'mw-lo' : 'mw-ok';
+}
+function lambdaAdj(n) {
+  if (n > 30000) return 'Spike ⚡';
+  if (n > 20000) return '+$15–30';
+  if (n > 10000) return '+$5–15';
+  if (n > 5000)  return '+$1–5';
+  return 'Minimal';
+}
+function lambdaAdjCls(n) {
+  return n > 20000 ? 'mw-hi' : n > 10000 ? 'mw-med' : n > 5000 ? 'mw-lo' : 'mw-ok';
+}
+
+// Proxy fetch helper — tries each proxy in order
+async function proxyFetch(url, timeoutMs = 9000) {
+  for (const mkProxy of PROXIES) {
+    try {
+      const proxyUrl = mkProxy(url);
+      const r = await fetch(proxyUrl, {signal: AbortSignal.timeout(timeoutMs)});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const content = j.contents ?? j.body ?? j;
+      if (!content || (typeof content === 'string' && content.length < 100)) throw new Error('Empty');
+      return typeof content === 'string' ? content : JSON.stringify(content);
+    } catch(e) {
+      // try next proxy
+    }
+  }
+  throw new Error('All proxies failed for ' + url.split('?')[0].split('/').pop());
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAP
+═══════════════════════════════════════════════════════════════ */
+function initMap() {
+  leafMap = L.map('ogMap', {center:[31.2,-99.5], zoom:6});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap contributors', maxZoom:13,
+  }).addTo(leafMap);
+
+  // Hub labels (permanent)
+  HUBS.forEach(h => {
+    L.circleMarker([h.lat, h.lon], {
+      radius:22, color:h.color, weight:1.5, fillColor:h.color, fillOpacity:0.07,
+    }).addTo(leafMap);
+    L.marker([h.lat, h.lon], {
+      icon: L.divIcon({
+        className:'',
+        html:`<div style="font-family:'DM Mono',monospace;font-size:9px;font-weight:600;
+                          color:${h.color};text-shadow:0 1px 4px rgba(0,0,0,.9);
+                          white-space:nowrap;transform:translate(-50%,-50%)">${h.label.toUpperCase()}</div>`,
+        iconSize:[60,14], iconAnchor:[30,7],
+      })
+    }).addTo(leafMap);
+  });
+}
+
+function clearMarkers() {
+  markers.forEach(({m}) => leafMap.removeLayer(m));
+  markers = [];
+}
+
+function buildMapMarkers() {
+  clearMarkers();
+  if (!genData) return;
+
+  const latest = Object.values(genData.current || {}).at(-1) || {};
+  const disp  = latest.Dispatchable || {};
+  const renew = latest.Renewable    || {};
+
+  // Get real zone data if 168hr loaded, else apportion ERCOT totals
+  const cur = get168Now();
+
+  function zoneData(zone) {
+    const sp  = ZONE_SPLIT[zone] || 0.2;
+    const key = zone.toLowerCase();
+    if (cur) {
+      return {
+        th:     (cur[`th_${key}`] || 0),
+        irr:    (cur[`ir_${key}`] || 0),
+        source: '168hr',
+      };
+    }
+    return {
+      th:     ((disp.total || 0) * sp),
+      irr:    ((renew.total || 0) * sp),
+      source: 'estimated',
+    };
+  }
+
+  Object.entries(ZONE_POS).forEach(([zone, [lat, lon]]) => {
+    const d = zoneData(zone);
+    const forced  = d.th  * (disp.unplanned && disp.total ? disp.unplanned / disp.total : 0.6);
+    const planned = d.th  * (disp.planned   && disp.total ? disp.planned   / disp.total : 0.4);
+    const irrMW   = d.irr;
+
+    const popExtra = `<br><span style="font-size:10px;color:var(--text-faint)">${d.source === '168hr' ? '✓ from NP3-233-CD' : '⚠ estimated from ERCOT totals'}</span>`;
+
+    // Forced — red circle
+    if (forced > 50) {
+      const r = Math.max(8, Math.min(50, Math.sqrt(forced) / 3.5));
+      const m = L.circleMarker([lat, lon], {
+        radius:r, color:'#ef4444', weight:2, fillColor:'#f87171', fillOpacity:0.45,
+      }).addTo(leafMap)
+        .bindPopup(`<b>${zone} — Forced/Unplanned</b><br>
+          <span class="tb tb-f">FORCED</span><br>
+          Thermal offline: <b>${fmtMW(forced)}</b>${popExtra}`);
+      markers.push({m, type:'forced'});
+    }
+
+    // Planned — blue, offset
+    if (planned > 50) {
+      const r2 = Math.max(7, Math.min(42, Math.sqrt(planned) / 4));
+      const m2 = L.circleMarker([lat + 0.45, lon + 0.65], {
+        radius:r2, color:'#3b82f6', weight:2, fillColor:'#60a5fa', fillOpacity:0.4,
+      }).addTo(leafMap)
+        .bindPopup(`<b>${zone} — Planned</b><br>
+          <span class="tb tb-p">PLANNED</span><br>
+          Thermal offline: <b>${fmtMW(planned)}</b>${popExtra}`);
+      markers.push({m: m2, type:'planned'});
+    }
+
+    // IRR — green, offset other direction
+    if (irrMW > 100) {
+      const ri = Math.max(5, Math.min(35, Math.sqrt(irrMW) / 5));
+      const mi = L.circleMarker([lat - 0.45, lon - 0.55], {
+        radius:ri, color:'#10b981', weight:2, fillColor:'#34d399', fillOpacity:0.38,
+      }).addTo(leafMap)
+        .bindPopup(`<b>${zone} — Renewable (IRR)</b><br>
+          <span class="tb tb-r">IRR</span><br>
+          Offline: <b>${fmtMW(irrMW)}</b>${popExtra}`);
+      markers.push({m: mi, type:'renew'});
+    }
+  });
+
+  document.getElementById('mapTs').textContent = latest.deliveryTime || '';
+  applyFilter();
+}
+
+function applyFilter() {
+  const sel = document.getElementById('mapFil').value;
+  markers.forEach(({m, type}) => {
+    const show = sel === 'all' || sel === type;
+    show ? (leafMap.hasLayer(m) || leafMap.addLayer(m))
+         : (leafMap.hasLayer(m) && leafMap.removeLayer(m));
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FETCH: GENERATION OUTAGES (direct — no proxy needed)
+═══════════════════════════════════════════════════════════════ */
+async function fetchGen() {
+  setSB('sb_gen','sbt_gen','loading','Fetching…');
+  try {
+    const r = await fetch(API_GEN + '?_=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    genData = await r.json();
+
+    const latest = Object.values(genData.current || {}).at(-1) || {};
+    const d = latest.Dispatchable || {};
+    const rn = latest.Renewable   || {};
+
+    setSB('sb_gen','sbt_gen','ok', `${(d.unplanned||0).toLocaleString()} MW forced`);
+    document.getElementById('st_disp').textContent     = fmtMW(d.total);
+    document.getElementById('st_disp').className       = `ss-val ${mwCls(d.total)}`;
+    document.getElementById('st_forced').textContent   = fmtMW(d.unplanned);
+    document.getElementById('st_planned').textContent  = fmtMW(d.planned);
+    document.getElementById('st_renew').textContent    = fmtMW(rn.total);
+    document.getElementById('st_forced_sub').textContent =
+      new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit'}) + ' CPT';
+
+    renderLiveChart();
+    buildMapMarkers();
+    renderZoneSnap();
+    log(`Gen outages: forced ${fmtMW(d.unplanned)}, planned ${fmtMW(d.planned)} at ${latest.deliveryTime}`, 'ok');
+  } catch(e) {
+    setSB('sb_gen','sbt_gen','err','Failed');
+    log(`Gen outages: ${e.message}`, 'e');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FETCH: RT SYSTEM CONDITIONS (proxy)
+═══════════════════════════════════════════════════════════════ */
+async function fetchSys() {
+  setSB('sb_sys','sbt_sys','loading','Fetching…');
+  try {
+    const html = await proxyFetch(API_SYS, 8000);
+    parseSysHtml(html);
+  } catch(e) {
+    setSB('sb_sys','sbt_sys','err','Proxy failed');
+    log(`RT conditions: ${e.message}`, 'w');
+  }
+}
+
+function parseSysHtml(html) {
+  const doc  = new DOMParser().parseFromString(html,'text/html');
+  const rows = doc.querySelectorAll('table tr');
+  const kv   = {};
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 2) kv[cells[0].textContent.trim()] = cells[1].textContent.trim();
+  });
+
+  const num = k => parseFloat((kv[k]||'0').replace(/,/g,''));
+  const demand = num('Actual System Demand');
+  const cap    = num('Total System Capacity (not including Ancillary Services)');
+  const wind   = num('Total Wind Output');
+  const solar  = num('Total PVGR Output');
+  const freq   = kv['Current Frequency'] || '—';
+  const rsv    = cap > 0 ? ((cap - demand) / demand * 100) : 0;
+
+  document.getElementById('sc_dem').textContent  = demand ? (demand/1000).toFixed(1)+' GW' : '—';
+  document.getElementById('sc_cap').textContent  = cap    ? (cap/1000).toFixed(1)+' GW'    : '—';
+  document.getElementById('sc_rsv').textContent  = cap    ? rsv.toFixed(1)+'%'             : '—';
+  document.getElementById('sc_rsv').className    = `sc-val ${rsv < 8 ? 'mw-hi' : rsv < 15 ? 'mw-med' : 'mw-ok'}`;
+  document.getElementById('sc_wnd').textContent  = wind   ? (wind/1000).toFixed(1)+' GW'   : '—';
+  document.getElementById('sc_sol').textContent  = solar  ? (solar/1000).toFixed(1)+' GW'  : '—';
+  document.getElementById('sc_frq').textContent  = freq;
+  document.getElementById('sc_frq').className    = `sc-val ${(parseFloat(freq) < 59.94 || parseFloat(freq) > 60.06) ? 'mw-hi' : 'mw-ok'}`;
+
+  const updEl = doc.querySelector('.lastUpdated, .last-updated');
+  if (updEl) document.getElementById('sc_upd').textContent = updEl.textContent.trim();
+
+  setSB('sb_sys','sbt_sys','ok', demand ? `${(demand/1000).toFixed(0)} GW · ${rsv.toFixed(0)}% rsv` : 'Parsed');
+  log(`RT conditions: ${(demand/1000).toFixed(1)} GW demand, ${rsv.toFixed(1)}% reserve`, 'ok');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FETCH: 168hr CSV (proxy MIS listing → download CSV)
+═══════════════════════════════════════════════════════════════ */
+async function fetch168() {
+  setSB('sb_168','sbt_168','loading','Fetching MIS list…');
+  document.getElementById('s168meta').textContent = 'Attempting proxy…';
+  try {
+    const listHtml = await proxyFetch(MIS_168, 10000);
+    const csvUrl   = extractCsvUrl(listHtml);
+    if (!csvUrl) throw new Error('No download link in report listing');
+    log(`168hr: found → ${csvUrl.split('?')[0].split('/').pop()}`, 'ok');
+
+    setSB('sb_168','sbt_168','loading','Downloading CSV…');
+    const csvText = await proxyFetch(csvUrl, 18000);
+    parseAndLoad168(csvText, 'proxy');
+
+  } catch(e) {
+    setSB('sb_168','sbt_168','err','Proxy blocked');
+    document.getElementById('s168meta').textContent = `${e.message} — paste CSV in 168hr tab`;
+    log(`168hr proxy: ${e.message}`, 'w');
+  }
+}
+
+function extractCsvUrl(html) {
+  const re = /href="(\/misdownload\/servlets\/mirDownload\?[^"]+)"/g;
+  const m  = re.exec(html);
+  return m ? 'https://mis.ercot.com' + m[1].replace(/&amp;/g,'&') : null;
+}
+
+function parsePasted() {
+  const txt = document.getElementById('csvPaste').value.trim();
+  if (!txt) { log('Nothing pasted', 'w'); return; }
+  parseAndLoad168(txt, 'manual paste');
+  document.getElementById('csvPaste').value = '';
+}
+
+function parseAndLoad168(csvText, src) {
+  if (!csvText || csvText.length < 300) {
+    setSB('sb_168','sbt_168','err','Too short');
+    log('168hr: response too short — may be a redirect page', 'w');
+    return;
+  }
+  // Detect ZIP binary (PK header)
+  if (csvText.charCodeAt(0) === 0x50 && csvText.charCodeAt(1) === 0x4B) {
+    setSB('sb_168','sbt_168','err','ZIP — need CSV');
+    document.getElementById('s168meta').textContent = 'Got a ZIP file. Unzip it and paste the CSV content.';
+    log('168hr: ZIP file received. Unzip and paste the .csv content.', 'w');
+    return;
+  }
+
+  try {
+    const lines   = csvText.replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(Boolean);
+    // Find header row (first row containing time/date column indicators)
+    let hi = lines.findIndex(l => /deliverydate|hourending|delivery_date/i.test(l));
+    if (hi < 0) hi = 0;
+    const headers = lines[hi].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase().replace(/\s+/g,''));
+
+    // Column finder
+    const col = (...patterns) => {
+      for (const p of patterns) {
+        const i = headers.findIndex(h => h.includes(p.toLowerCase().replace(/\s+/g,'')));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+
+    const C = {
+      date:  col('deliverydate','delivery_date','operday'),
+      hour:  col('hourending','hour_ending'),
+      thN:   col('totalresourcemwzonenorth','resourcemwzonenorth'),
+      thH:   col('totalresourcemwzonehouston','resourcemwzonehouston'),
+      thS:   col('totalresourcemwzonesouth','resourcemwzonesouth'),
+      thW:   col('totalresourcemwzonewest','resourcemwzonewest'),
+      irN:   col('totalirrmwzonenorth','irrmwzonenorth'),
+      irH:   col('totalirrmwzonehouston','irrmwzonehouston'),
+      irS:   col('totalirrmwzonesouth','irrmwzonesouth'),
+      irW:   col('totalirrmwzonewest','irrmwzonewest'),
+    };
+
+    const parsed = lines.slice(hi + 1).map(line => {
+      const v    = line.split(',').map(x => x.trim().replace(/"/g,''));
+      const dateStr = C.date >= 0 ? v[C.date] : '';
+      const hRaw    = C.hour >= 0 ? parseInt(v[C.hour]) : 0;
+      const hIdx    = isNaN(hRaw) ? 0 : Math.max(0, hRaw - 1); // HourEnding 1 = 00:00
+      // Normalize date format M/D/YYYY → YYYY-MM-DD
+      let normDate = dateStr;
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+        const [m,d,y] = dateStr.split('/');
+        normDate = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+      }
+      const time = normDate ? `${normDate}T${String(hIdx).padStart(2,'0')}:00` : '';
+      const pf = i => parseFloat(v[i] || 0) || 0;
+      return {
+        time,
+        th_north:   pf(C.thN), th_houston: pf(C.thH),
+        th_south:   pf(C.thS), th_west:    pf(C.thW),
+        ir_north:   pf(C.irN), ir_houston: pf(C.irH),
+        ir_south:   pf(C.irS), ir_west:    pf(C.irW),
+      };
+    }).filter(r => r.time);
+
+    if (!parsed.length) throw new Error('No parseable rows found — check column names');
+
+    data168 = parsed;
+    setSB('sb_168','sbt_168','ok', `${parsed.length} hrs`);
+    document.getElementById('s168meta').textContent = `${parsed.length} hourly rows · ${src}`;
+    log(`168hr loaded: ${parsed.length} rows from ${src}`, 'ok');
+
+    render168Chart();
+    renderZoneBreakdown();
+    renderKeyHourSlots();
+    buildMapMarkers(); // refresh with real zone data
+
+  } catch(e) {
+    setSB('sb_168','sbt_168','err','Parse error');
+    log(`168hr parse: ${e.message}`, 'e');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   168hr helpers
+═══════════════════════════════════════════════════════════════ */
+function get168Now() {
+  if (!data168 || !data168.length) return null;
+  const now = new Date().toISOString().slice(0, 13);
+  return data168.find(r => r.time && r.time.slice(0,13) >= now) || data168[0];
+}
+
+function get168At(dateStr, hour) {
+  if (!data168) return null;
+  const target = `${dateStr}T${String(hour).padStart(2,'0')}`;
+  return data168.find(r => r.time && r.time.slice(0,13) === target) || null;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER: LIVE CHART
+═══════════════════════════════════════════════════════════════ */
+function renderLiveChart() {
+  if (!genData) return;
+  const todayStr = (genData.days?.current || [])[0]
+    || new Date().toLocaleDateString('en-CA', {timeZone:'America/Chicago'});
+
+  // Collect all 5-min intervals for today
+  const keys = Object.keys(genData.current || {});
+  const todayItems = keys
+    .map(k => ({ts:parseInt(k), ...genData.current[k]}))
+    .filter(v => v.deliveryTime?.startsWith(todayStr));
+
+  if (!todayItems.length) {
+    document.getElementById('liveChart').innerHTML = '<div style="padding:12px;color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No today data yet</div>';
+    return;
+  }
+
+  const maxMW = Math.max(...todayItems.map(v => (v.Dispatchable?.total || 0))) * 1.1 || 40000;
+  const nowMs = Date.now();
+  const step  = Math.max(1, Math.floor(todayItems.length / 52));
+
+  let bars = '', xlbls = '';
+  todayItems.forEach((v, i) => {
+    const forced  = v.Dispatchable?.unplanned || 0;
+    const planned = v.Dispatchable?.planned   || 0;
+    const total   = forced + planned;
+    const pct     = (total / maxMW * 100).toFixed(1);
+    const forcedPct = (forced / Math.max(total, 1) * 100).toFixed(1);
+    const isPast  = v.ts <= nowMs;
+    const alpha   = isPast ? 1 : 0.55;
+    const lbl     = v.deliveryTime?.slice(11, 16) || '';
+
+    bars += `<div class="bc-bar"
+      style="height:${pct}%;
+             background:linear-gradient(to top,
+               rgba(96,165,250,${0.6 * alpha}) ${100 - forcedPct}%,
+               rgba(248,113,113,${0.8 * alpha}) ${100 - forcedPct}% 100%);"
+      title="${v.deliveryTime}: ${fmtMW(forced)} forced · ${fmtMW(planned)} planned"></div>`;
+
+    xlbls += i % step === 0 ? `<div class="x-lbl">${lbl}</div>` : `<div class="x-lbl"></div>`;
+  });
+
+  document.getElementById('liveChart').innerHTML = bars;
+  document.getElementById('liveX').innerHTML      = xlbls;
+  document.getElementById('liveMeta').textContent =
+    `${todayItems.length} intervals · peak ${fmtMW(Math.max(...todayItems.map(v => v.Dispatchable?.total || 0)))}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER: 168hr FORWARD CHART
+═══════════════════════════════════════════════════════════════ */
+function render168Chart() {
+  if (!data168 || !data168.length) return;
+
+  const sample = data168.filter((_,i) => i % 6 === 0).slice(0, 28);
+  const allMax = Math.max(...sample.map(r => {
+    return r.th_north+r.th_houston+r.th_south+r.th_west
+         + r.ir_north+r.ir_houston+r.ir_south+r.ir_west;
+  })) * 1.1 || 40000;
+
+  const nowStr = new Date().toISOString().slice(0, 13);
+  let bars = '', xlbls = '';
+
+  sample.forEach(r => {
+    const th   = r.th_north + r.th_houston + r.th_south + r.th_west;
+    const irr  = r.ir_north + r.ir_houston + r.ir_south + r.ir_west;
+    const hTh  = (th  / allMax * 100).toFixed(1);
+    const hIrr = (irr / allMax * 100).toFixed(1);
+    const isPast = r.time <= nowStr + ':99';
+    const lbl    = r.time?.slice(8, 13) || '';
+
+    bars += `<div class="fwd-bar"
+      style="height:${(parseFloat(hTh)+parseFloat(hIrr)).toFixed(1)}%;opacity:${isPast ? .55 : 1}"
+      title="${r.time}: Thermal ${fmtMW(th)} · IRR ${fmtMW(irr)}">
+        <div class="seg-th"  style="height:${hTh}%"></div>
+        <div class="seg-irr" style="height:${hIrr}%;bottom:${hTh}%"></div>
+    </div>`;
+    xlbls += `<div class="x-lbl">${lbl}</div>`;
+  });
+
+  document.getElementById('chart168').innerHTML = bars;
+  document.getElementById('x168').innerHTML     = xlbls;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER: ZONE BREAKDOWN
+═══════════════════════════════════════════════════════════════ */
+function renderZoneBreakdown() {
+  if (!data168) return;
+  const cur = get168Now();
+  if (cur) {
+    [['north','North'],['houston','Houston'],['south','South'],['west','West']].forEach(([k]) => {
+      const th = cur[`th_${k}`] || 0;
+      const ir = cur[`ir_${k}`] || 0;
+      const thEl = document.getElementById(`zt_${k}`);
+      const irEl = document.getElementById(`zi_${k}`);
+      if (thEl) { thEl.textContent = fmtMW(th); thEl.className = `z-th ${mwCls(th)}`; }
+      if (irEl)   irEl.textContent = fmtMW(ir) + ' IRR';
+    });
+  }
+
+  // Table: next 24 hours
+  const now = new Date();
+  const rows = data168.filter(r => {
+    if (!r.time) return false;
+    const t = new Date(r.time);
+    return t >= now && t < new Date(now.getTime() + 24 * 3600000);
+  }).slice(0, 24);
+
+  document.getElementById('zoneTbody').innerHTML = rows.map(r => {
+    const th = r.th_north + r.th_houston + r.th_south + r.th_west;
+    const ir = r.ir_north + r.ir_houston + r.ir_south + r.ir_west;
+    const lbl = new Date(r.time).toLocaleString('en-US',
+      {timeZone:'America/Chicago', month:'short', day:'numeric', hour:'numeric', hour12:true});
+    return `<tr>
+      <td><strong>${lbl}</strong></td>
+      <td class="r ${mwCls(r.th_north)}">${fmtMW(r.th_north)}</td>
+      <td class="r ${mwCls(r.th_houston)}">${fmtMW(r.th_houston)}</td>
+      <td class="r ${mwCls(r.th_south)}">${fmtMW(r.th_south)}</td>
+      <td class="r ${mwCls(r.th_west)}">${fmtMW(r.th_west)}</td>
+      <td class="r"><strong class="${mwCls(th)}">${fmtMW(th)}</strong></td>
+      <td class="r mw-ok">${fmtMW(ir)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--text-faint)">No rows in next 24hrs</td></tr>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER: KEY HOUR SLOTS
+═══════════════════════════════════════════════════════════════ */
+function renderKeyHourSlots() {
+  if (!data168) return;
+
+  const now      = new Date();
+  const today    = now.toLocaleDateString('en-CA', {timeZone:'America/Chicago'});
+  const tomorrow = new Date(now.getTime() + 86400000).toLocaleDateString('en-CA', {timeZone:'America/Chicago'});
+
+  const rows = [];
+  [today, tomorrow].forEach((date, di) => {
+    SLOTS.forEach(({h, lbl}) => rows.push({r: get168At(date, h), lbl, dayLbl: di === 0 ? 'Today' : 'D+1'}));
+  });
+
+  document.getElementById('khTbody').innerHTML = rows.map(({r, lbl, dayLbl}) => {
+    if (!r) return `<tr><td>${lbl}</td><td>${dayLbl}</td><td colspan="6" style="color:var(--text-faint);text-align:center">No data</td></tr>`;
+    const th  = r.th_north + r.th_houston + r.th_south + r.th_west;
+    return `<tr>
+      <td><strong>${lbl}</strong></td>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">${dayLbl}</td>
+      <td class="r ${mwCls(r.th_north)}">${fmtMW(r.th_north)}</td>
+      <td class="r ${mwCls(r.th_houston)}">${fmtMW(r.th_houston)}</td>
+      <td class="r ${mwCls(r.th_south)}">${fmtMW(r.th_south)}</td>
+      <td class="r ${mwCls(r.th_west)}">${fmtMW(r.th_west)}</td>
+      <td class="r"><strong class="${mwCls(th)}">${fmtMW(th)}</strong></td>
+      <td class="r ${lambdaAdjCls(th)}" style="font-family:var(--font-mono);font-size:10px">${lambdaAdj(th)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER: ZONE SNAPSHOT (right panel)
+═══════════════════════════════════════════════════════════════ */
+function renderZoneSnap() {
+  if (!genData) return;
+  const latest = Object.values(genData.current || {}).at(-1) || {};
+  const d  = latest.Dispatchable || {};
+  const rn = latest.Renewable    || {};
+  const forcedFrac  = d.total ? (d.unplanned || 0) / d.total : 0.6;
+  const plannedFrac = d.total ? (d.planned   || 0) / d.total : 0.4;
+
+  let html = `<table class="dt"><thead><tr>
+    <th>Zone</th><th class="r">Forced</th><th class="r">Planned</th><th class="r">λ Adj.</th>
+  </tr></thead><tbody>`;
+
+  const zones = ['North','Houston','South','West','Pan'];
+  zones.forEach(z => {
+    const sp  = ZONE_SPLIT[z] || 0.2;
+    const cur = get168Now();
+    const th  = cur && z !== 'Pan'
+      ? (cur[`th_${z.toLowerCase()}`] || 0)
+      : (d.total || 0) * sp;
+    const forced  = th * forcedFrac;
+    const planned = th * plannedFrac;
+    const hub = HUBS.find(h => h.label === z || (z === 'Pan' && h.id === 'HB_PAN'));
+    const color = hub?.color || '#68788e';
+    html += `<tr>
+      <td style="color:${color};font-family:var(--font-mono);font-size:11px">${z}</td>
+      <td class="r ${mwCls(forced)}">${fmtMW(forced)}</td>
+      <td class="r mw-lo">${fmtMW(planned)}</td>
+      <td class="r ${lambdaAdjCls(th)}" style="font-family:var(--font-mono);font-size:10px">${lambdaAdj(th)}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>
+  <div style="margin-top:7px;font-family:var(--font-mono);font-size:9px;color:var(--text-faint)">
+    ${data168 ? '✓ Zone data from NP3-233-CD' : '⚠ Estimated splits — load 168hr for zone accuracy'}
+  </div>`;
+  document.getElementById('zoneSnap').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REFRESH ALL
+═══════════════════════════════════════════════════════════════ */
+async function refreshAll(manual = false) {
+  if (manual) log('Manual refresh triggered', 'd');
+  document.getElementById('sp').style.display = 'inline-block';
+
+  await Promise.allSettled([fetchGen(), fetchSys(), fetch168()]);
+
+  const now    = new Date();
+  const nowStr = now.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'2-digit', minute:'2-digit', hour12:false});
+  document.getElementById('lastTs').textContent  = nowStr + ' CPT';
+  document.getElementById('lastUpd').textContent = 'Updated ' + nowStr;
+  document.getElementById('sp').style.display    = 'none';
+  updateNextLabel();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTO-REFRESH
+═══════════════════════════════════════════════════════════════ */
+function setAutoRefresh() {
+  if (autoTmr) { clearInterval(autoTmr); autoTmr = null; }
+  const ms = parseInt(document.getElementById('rifSel').value);
+  if (!ms) { document.getElementById('nextTs').textContent = 'Manual only'; return; }
+  nxtRef  = new Date(Date.now() + ms);
+  autoTmr = setInterval(() => { refreshAll(); nxtRef = new Date(Date.now() + ms); updateNextLabel(); }, ms);
+  updateNextLabel();
+  log(`Auto-refresh: every ${ms/60000} min`, 'd');
+}
+
+function updateNextLabel() {
+  if (!nxtRef) { document.getElementById('nextTs').textContent = 'Manual only'; return; }
+  document.getElementById('nextTs').textContent =
+    nxtRef.toLocaleTimeString('en-US', {timeZone:'America/Chicago', hour:'2-digit', minute:'2-digit', hour12:false}) + ' CPT';
+}
+setInterval(updateNextLabel, 30000);
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS / THEME
+═══════════════════════════════════════════════════════════════ */
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`pane_${id}`)?.classList.add('active');
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('et-theme', next);
+  document.getElementById('ti').textContent = next === 'light' ? '🌙' : '☀️';
+  document.getElementById('tl').textContent = next === 'light' ? 'Dark' : 'Light';
+}
+(function(){
+  const t = localStorage.getItem('et-theme') || 'dark';
+  document.getElementById('ti').textContent = t === 'light' ? '🌙' : '☀️';
+  document.getElementById('tl').textContent = t === 'light' ? 'Dark' : 'Light';
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('load', () => {
+  initMap();
+  setAutoRefresh();  // default 15-min from select
+  refreshAll();      // immediate first fetch
+});
+</script>
+</body>
+</html>

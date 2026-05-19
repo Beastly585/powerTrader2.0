@@ -24,7 +24,7 @@
     .col-left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
     .col-right { display: flex; flex-direction: column; gap: 16px; }
 
-    /* Map */
+    /* Map */ 
     #tx-map {
       height: 380px;
       border-radius: var(--r2);
@@ -782,17 +782,26 @@ function buildPredSection(date, entry, forecasts) {
       if (hasActual || hasRtJson) legend += `<span class="text-xs mono" style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);display:inline-block"></span> Actual RT SPP</span>`;
       legend += `</div>`;
 
+      // Build table — total forecast = lambda + congestion, accuracy on total
       let html = legend + `<div class="overflow-x"><table class="pred-table">
-        <thead><tr>
-          <th>Hub</th>
-          <th style="color:var(--blue)">DAM $/MWh</th>
-          <th style="color:var(--amber)">My Forecast</th>
-          <th style="color:var(--amber)">+ Congestion</th>
-          <th style="color:var(--green)">Actual RT</th>
-          <th>vs DAM</th>
-          <th>Accuracy</th>
-          <th>Weather</th>
-        </tr></thead><tbody>`;
+        <thead>
+          <tr>
+            <th rowspan="2">Hub</th>
+            <th style="color:var(--blue);text-align:center" colspan="1">ERCOT</th>
+            <th style="color:var(--amber);text-align:center;border-left:1px solid var(--border)" colspan="3">My Prediction</th>
+            <th style="color:var(--green);text-align:center;border-left:1px solid var(--border)" colspan="3">Result</th>
+            <th rowspan="2">Weather</th>
+          </tr>
+          <tr>
+            <th style="color:var(--blue)">DAM</th>
+            <th style="color:var(--amber);border-left:1px solid var(--border)">λ energy</th>
+            <th style="color:var(--purple)">+ cong</th>
+            <th style="color:var(--amber);font-weight:700">= Total</th>
+            <th style="color:var(--green);border-left:1px solid var(--border)">Actual RT</th>
+            <th>Δ vs pred</th>
+            <th>Accuracy</th>
+          </tr>
+        </thead><tbody>`;
 
       rows.forEach(r => {
         const hub = APP.hubById(r.hub);
@@ -800,38 +809,47 @@ function buildPredSection(date, entry, forecasts) {
           ? { tempF: r.wx_temp_f, desc: r.wx_condition || '—', windMph: r.wx_wind_mph, windDir: r.wx_wind_dir }
           : null;
 
-        // Actual: prefer manual actual_energy, fall back to rt_prices JSONB
         const rtFromJson = slotPrice(r.rt_hourly, slot);
         const actualVal  = r.actual_energy ?? rtFromJson;
 
-        // vs DAM delta (actual vs DAM)
-        const vsDam = (actualVal !== null && r.dam_price !== null)
-          ? (actualVal - r.dam_price)
-          : null;
-        const vsDamEl = vsDam !== null
-          ? `<span class="delta delta--${vsDam > 0 ? 'pos' : vsDam < 0 ? 'neg' : 'zero'}">${vsDam > 0 ? '+' : ''}${vsDam.toFixed(2)}</span>`
+        // Total forecast = lambda + congestion (this is our actual prediction)
+        const predTotal = (r.pred_energy != null && r.pred_congestion != null)
+          ? r.pred_energy + r.pred_congestion
+          : (r.pred_energy ?? null);
+
+        // Δ = actual minus our total prediction
+        const delta = (actualVal !== null && predTotal !== null) ? (actualVal - predTotal) : null;
+        const deltaEl = delta !== null
+          ? `<span class="delta delta--${delta > 0 ? 'pos' : delta < 0 ? 'neg' : 'zero'}">${delta > 0 ? '+' : ''}${delta.toFixed(2)}</span>`
           : '<span class="text-faint">—</span>';
+
+        // Accuracy: total prediction vs actual (not just lambda)
+        const accEl = (actualVal !== null && predTotal !== null)
+          ? UI.accuracyBadge(predTotal, actualVal)
+          : '<span class="acc-badge acc-badge--na">—</span>';
+
+        // Highlight total column — this is the key number
+        const totalCls = predTotal !== null ? `price price--${APP.priceTier(predTotal)}` : '';
 
         html += `<tr>
           <td><div class="hub-col">${UI.hubDot(r.hub)}<span>${hub?.label ?? r.hub}</span></div></td>
           <td class="num" style="color:var(--blue)">${UI.priceBadge(r.dam_price)}</td>
-          <td class="num" style="color:var(--amber)">${UI.priceBadge(r.pred_energy)}</td>
-          <td class="num">${UI.priceBadge(r.pred_congestion)}</td>
-          <td class="num" style="color:var(--green)">${actualVal !== null
-            ? UI.priceBadge(actualVal)
-            : '<span class="text-faint">pending</span>'}</td>
-          <td class="num">${vsDamEl}</td>
-          <td>${actualVal !== null && r.pred_energy !== null
-            ? UI.accuracyBadge(r.pred_energy, actualVal)
-            : '<span class="acc-badge acc-badge--na">—</span>'}</td>
+          <td class="num" style="color:var(--amber);border-left:1px solid var(--border)">${UI.priceBadge(r.pred_energy)}</td>
+          <td class="num" style="color:var(--purple)">${r.pred_congestion != null ? UI.priceBadge(r.pred_congestion) : '<span class="text-faint">—</span>'}</td>
+          <td class="num" style="font-weight:700;background:rgba(245,166,35,0.06)">
+            ${predTotal !== null ? `<span class="${totalCls}" style="font-size:13px">${APP.fmtPrice(predTotal)}</span>` : '<span class="text-faint">—</span>'}
+          </td>
+          <td class="num" style="color:var(--green);border-left:1px solid var(--border)">${actualVal !== null ? UI.priceBadge(actualVal) : '<span class="text-faint">pending</span>'}</td>
+          <td class="num">${deltaEl}</td>
+          <td>${accEl}</td>
           <td>${UI.wxChip(wx)}</td>
         </tr>`;
 
         if (r.pred_notes) {
-          html += `<tr><td colspan="8" style="color:var(--text-dim);font-size:12px;padding:2px 10px 10px;border-bottom:1px solid var(--border)">↳ ${UI.escapeHtml(r.pred_notes)}</td></tr>`;
+          html += `<tr><td colspan="9" style="color:var(--text-dim);font-size:12px;padding:2px 10px 10px;border-bottom:1px solid var(--border)">↳ ${UI.escapeHtml(r.pred_notes)}</td></tr>`;
         }
         if (r.review_notes) {
-          html += `<tr><td colspan="8" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>`;
+          html += `<tr><td colspan="9" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>`;
         }
       });
 
@@ -874,7 +892,11 @@ function buildCompareSection(date, entry, forecasts) {
   if (hasActuals) {
     const accs = graded.map(f => {
       const actual = f.actual_energy ?? slotPrice(f.rt_hourly, f.hour_slot);
-      return APP.accuracy(f.pred_energy, actual);
+      // Use total forecast (energy + congestion) as the prediction
+      const predTotal = (f.pred_energy != null && f.pred_congestion != null)
+        ? f.pred_energy + f.pred_congestion
+        : f.pred_energy;
+      return APP.accuracy(predTotal, actual);
     }).filter(a => a !== null);
     if (accs.length) dayAcc = Math.round(accs.reduce((a,b)=>a+b,0)/accs.length);
   }
@@ -918,37 +940,42 @@ function buildCompareTable(forecasts) {
         <thead><tr>
           <th>Hub</th>
           <th style="color:var(--blue)">DAM</th>
-          <th style="color:var(--amber)">Forecast</th>
+          <th style="color:var(--amber)">λ energy</th>
+          <th style="color:var(--purple)">+ cong</th>
+          <th style="color:var(--amber);font-weight:700">= Total Pred</th>
           <th style="color:var(--green)">Actual RT</th>
-          <th>Δ RT–DAM</th>
-          <th>Δ RT–Forecast</th>
-          <th>Acc.</th>
+          <th>Δ actual–pred</th>
+          <th>Accuracy</th>
         </tr></thead><tbody>`;
 
     rows.forEach(r => {
-      const actual = r.actual_energy ?? slotPrice(r.rt_hourly, r.hour_slot);
-      const vsDAM  = (actual !== null && r.dam_price !== null)
-        ? actual - r.dam_price : null;
-      const vsFc   = (actual !== null && r.pred_energy !== null)
-        ? actual - r.pred_energy : null;
+      const actual   = r.actual_energy ?? slotPrice(r.rt_hourly, r.hour_slot);
+      const predTotal = (r.pred_energy != null && r.pred_congestion != null)
+        ? r.pred_energy + r.pred_congestion
+        : r.pred_energy;
+      const vsFc = (actual !== null && predTotal !== null) ? actual - predTotal : null;
 
-      const dEl = (v, invert = false) => {
+      const dEl = (v) => {
         if (v === null) return '<span class="text-faint">—</span>';
-        const pos = invert ? v < 0 : v > 0;
-        const cls = v === 0 ? 'zero' : pos ? 'pos' : 'neg';
+        const cls = v === 0 ? 'zero' : v > 0 ? 'pos' : 'neg';
         return `<span class="delta delta--${cls}">${v > 0 ? '+' : ''}${v.toFixed(2)}</span>`;
       };
+
+      const totalCls = predTotal !== null ? `price price--${APP.priceTier(predTotal)}` : '';
 
       html += `<tr>
         <td><div class="hub-col">${UI.hubDot(r.hub)} ${APP.hubById(r.hub)?.label ?? r.hub}</div></td>
         <td class="num" style="color:var(--blue)">${UI.priceBadge(r.dam_price)}</td>
         <td class="num" style="color:var(--amber)">${UI.priceBadge(r.pred_energy)}</td>
+        <td class="num" style="color:var(--purple)">${r.pred_congestion != null ? UI.priceBadge(r.pred_congestion) : '<span class="text-faint">—</span>'}</td>
+        <td class="num" style="font-weight:700;background:rgba(245,166,35,0.06)">
+          ${predTotal !== null ? `<span class="${totalCls}">${APP.fmtPrice(predTotal)}</span>` : '<span class="text-faint">—</span>'}
+        </td>
         <td class="num" style="color:var(--green)">${actual !== null ? UI.priceBadge(actual) : '<span class="text-faint">pending</span>'}</td>
-        <td class="num">${dEl(vsDAM)}</td>
         <td class="num">${dEl(vsFc)}</td>
-        <td>${actual !== null && r.pred_energy !== null ? UI.accuracyBadge(r.pred_energy, actual) : '<span class="acc-badge acc-badge--na">—</span>'}</td>
+        <td>${(actual !== null && predTotal !== null) ? UI.accuracyBadge(predTotal, actual) : '<span class="acc-badge acc-badge--na">—</span>'}</td>
       </tr>
-      ${r.review_notes ? `<tr><td colspan="7" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>` : ''}`;
+      ${r.review_notes ? `<tr><td colspan="8" style="color:var(--blue);font-size:12px;padding:2px 10px 10px">✎ ${UI.escapeHtml(r.review_notes)}</td></tr>` : ''}`;
     });
 
     html += '</tbody></table></div>';

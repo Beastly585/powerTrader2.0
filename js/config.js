@@ -74,10 +74,83 @@ const APP = {
     if (isNaN(n)) return '';
     return (APP.PRICE_TIERS.find(t => n <= t.max) ?? APP.PRICE_TIERS.at(-1)).cls;
   },
-  accuracy(pred, actual) {
+  // accuracy(pred, actual, dam?)
+  // Returns 0-100. Rewards beating the DAM when dam is provided.
+  //
+  // Base: 100 - (|pred-actual| / |actual|) * 100, clamped 0-100
+  // Bonus: if |pred-actual| < |dam-actual|, you beat the DAM — scale accordingly
+  //   beatRatio = |dam-actual| / max(|pred-actual|, 0.01)
+  //   if beatRatio > 1 (you were closer than DAM), boost the score
+  //   the further DAM was wrong and closer you were, the bigger the boost
+  // Final score = weighted blend: 60% raw accuracy + 40% relative-to-DAM score
+  //
+  // When dam is not provided, returns simple raw accuracy (0-100).
+  // accuracy(pred, actual, dam?)
+  // ─────────────────────────────────────────────────────
+  // Returns 0–100 based purely on DELTA (|pred - actual|).
+  // Fixes the sign-flip problem: predicting $2 when RT = -$0.83
+  // is a delta of $2.83 — NOT a 0% accuracy. The old formula
+  // divided by |actual| which blows up near zero and punishes
+  // sign mismatches disproportionately.
+  //
+  // New formula uses a sliding scale anchored to $50 as a
+  // "wide miss" reference (roughly the width of typical intraday
+  // price swings). A $2.83 delta → score = 100 - (2.83/50)*100 = 94%.
+  //
+  // When dam is provided, also computes a vs-DAM score:
+  //   vs_dam = 100 if |pred-actual| ≤ |dam-actual| (you beat DAM)
+  //          = max(0, 100 - ((predErr-damErr)/50)*100) if DAM won
+  //
+  // Final = 60% delta score + 40% vs-DAM score
+  //
+  // Static helpers:
+  //   accuracy.delta(pred, actual)        → 0–100 (delta only)
+  //   accuracy.vsDam(pred, actual, dam)   → 0–100 (vs-DAM component)
+  //   accuracy.mae(pred, actual)          → raw $ delta
+  accuracy(pred, actual, dam) {
     const p = parseFloat(pred), a = parseFloat(actual);
-    if (isNaN(p) || isNaN(a) || a === 0) return null;
-    return Math.round((1 - Math.abs(p - a) / Math.abs(a)) * 100);
+    if (isNaN(p) || isNaN(a)) return null;
+
+    // Delta-based score: scale $0 → 100, $50 → 0, linear
+    const SCALE = 50;   // $/MWh reference for "complete miss"
+    const predErr  = Math.abs(p - a);
+    const deltaScore = Math.max(0, Math.min(100, Math.round((1 - predErr / SCALE) * 100)));
+
+    if (dam === undefined || dam === null) return deltaScore;
+
+    const d = parseFloat(dam);
+    if (isNaN(d)) return deltaScore;
+
+    const damErr = Math.abs(d - a);
+    let vsDamScore;
+    if (damErr < 0.01) {
+      // DAM was perfect — vs-DAM score just mirrors delta score
+      vsDamScore = deltaScore;
+    } else if (predErr <= damErr) {
+      // You beat or tied DAM — scale 50–100 based on how much better
+      const improvement = (damErr - predErr) / SCALE;
+      vsDamScore = Math.min(100, Math.round(75 + improvement * 25));
+    } else {
+      // DAM beat you — scale 0–50 based on how much worse
+      const penalty = (predErr - damErr) / SCALE;
+      vsDamScore = Math.max(0, Math.round(50 - penalty * 100));
+    }
+
+    return Math.max(0, Math.min(100, Math.round(deltaScore * 0.6 + vsDamScore * 0.4)));
+  },
+
+  // Helper for UI: raw $ delta
+  accuracyMAE(pred, actual) {
+    const p = parseFloat(pred), a = parseFloat(actual);
+    if (isNaN(p) || isNaN(a)) return null;
+    return Math.abs(p - a);
+  },
+
+  // Helper: did this prediction beat the DAM?
+  beatsDam(pred, actual, dam) {
+    const p=parseFloat(pred), a=parseFloat(actual), d=parseFloat(dam);
+    if (isNaN(p)||isNaN(a)||isNaN(d)) return null;
+    return Math.abs(p-a) <= Math.abs(d-a);
   },
   todayCPT() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
