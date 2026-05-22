@@ -783,7 +783,7 @@
         <div class="hstat-sub">$/MWh avg miss</div>
       </div>
       <div class="hstat">
-        <div class="hstat-label">Beats Day Ahead Market</div>
+        <div class="hstat-label">Beats DAM</div>
         <div class="hstat-val b" id="s-beats">—</div>
         <div class="hstat-sub">of forecasts</div>
       </div>
@@ -923,7 +923,7 @@
   <div class="pcont">
     <p>Kevin Maresca &middot; Independent ERCOT Market Analysis</p>
     <p class="pfooter-row">
-      <a href="https://www.linkedin.com/in/kevin-maresca-565369251/" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="https://www.linkedin.com/in/kevinmaresca" target="_blank" rel="noopener">LinkedIn</a>
       &nbsp;&middot;&nbsp;
       <a href="mailto:kevin.maresca@gmail.com">kevin.maresca@gmail.com</a>
     </p>
@@ -1054,7 +1054,6 @@ async function loadStats(){
   }
 
   // Hero stats
-  document.getElementById('s-days').textContent = stats.sampleSize ? Math.ceil(stats.sampleSize/20)+'+' : '—';
   document.getElementById('s-acc').textContent   = stats.overall!==null ? stats.overall+'%' : '—';
   document.getElementById('s-acc-sub').textContent = stats.overall!==null
     ? (stats.overall>=80?'ahead of DAM':stats.overall>=65?'tracking':'building') : '';
@@ -1074,7 +1073,7 @@ async function loadStats(){
       <div class="sc-sub">$/MWh average miss</div>
     </div>
     <div class="sc">
-      <div class="sc-label">Beats Day Ahead Market (DAM)</div>
+      <div class="sc-label">Beats DAM</div>
       <div class="sc-val" style="color:var(--blue)">${beatsRate??'—'}</div>
       <div class="sc-sub">prediction beats DAM price</div>
     </div>
