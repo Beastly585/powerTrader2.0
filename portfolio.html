@@ -4,242 +4,993 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kevin Maresca — ERCOT Market Analysis</title>
-  <meta name="description" content="Independent ERCOT day-ahead price forecasting — daily LMP predictions across Texas hubs with tracked accuracy.">
-  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('et-theme') || 'dark');</script>
+  <meta name="description" content="Independent ERCOT day-ahead LMP forecasting across Texas hubs — daily predictions tracked against settlement with structured morning thesis and evening review.">
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('et-theme')||'dark');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --bg:#0a0b0e;--bg1:#0f1117;--bg2:#161b26;--bg3:#1e2535;
-      --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
-      --text:#c9d1e0;--text-dim:#7a8599;--text-hi:#f0f4ff;
-      --amber:#f5a623;--amber2:rgba(245,166,35,0.11);
-      --green:#34d399;--blue:#60a5fa;--purple:#a78bfa;--red:#f87171;
-      --mono:'IBM Plex Mono',monospace;
-      --serif:'Playfair Display',Georgia,serif;
-      --sans:'DM Sans',system-ui,sans-serif;
-      --r:4px;--r2:8px;--r3:12px;--t:0.15s ease;
+    /* ── RESET ────────────────────────────────────────────── */
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── TOKENS ───────────────────────────────────────────── */
+    :root {
+      --bg:      #08090c;
+      --bg1:     #0e1118;
+      --bg2:     #141922;
+      --bg3:     #1b2130;
+      --border:  rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #b8c4d8;
+      --text-dim:#60708a;
+      --text-hi: #edf2ff;
+      --amber:   #f5a623;
+      --amber2:  rgba(245,166,35,0.10);
+      --green:   #34d399;
+      --blue:    #60a5fa;
+      --purple:  #a78bfa;
+      --red:     #f87171;
+      --mono:    'IBM Plex Mono', monospace;
+      --serif:   'Playfair Display', Georgia, serif;
+      --sans:    'DM Sans', system-ui, sans-serif;
+      --r:  6px;
+      --r2: 12px;
+      --r3: 16px;
+      --t:  0.15s ease;
+      --nav-h:   52px;
+      --side-w:  52px;
     }
-    [data-theme="light"]{
-      --bg:#f4f5f8;--bg1:#ffffff;--bg2:#eef0f4;--bg3:#e2e5ec;
-      --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
-      --text:#374151;--text-dim:#6b7280;--text-hi:#111827;
-      --amber:#d97706;--amber2:rgba(217,119,6,0.07);
-      --green:#059669;--blue:#2563eb;--purple:#7c3aed;--red:#dc2626;
+    [data-theme="light"] {
+      --bg:      #f0f2f7;
+      --bg1:     #ffffff;
+      --bg2:     #e8ebf2;
+      --bg3:     #dde0ea;
+      --border:  rgba(0,0,0,0.07);
+      --border2: rgba(0,0,0,0.13);
+      --text:    #3a4357;
+      --text-dim:#6b7a94;
+      --text-hi: #0d1526;
+      --amber:   #c27a0e;
+      --amber2:  rgba(194,122,14,0.08);
+      --green:   #047857;
+      --blue:    #1d4ed8;
+      --purple:  #6d28d9;
+      --red:     #b91c1c;
     }
-    html{scroll-behavior:smooth}
-    body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 
-    /* NAV */
-    .pnav{position:sticky;top:0;z-index:100;background:rgba(10,11,14,0.93);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;height:52px;gap:0}
-    [data-theme="light"] .pnav{background:rgba(255,255,255,0.93)}
-    .pnav-brand{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--amber);letter-spacing:.06em;text-decoration:none;margin-right:auto}
-    .pnav-links{display:flex;gap:2px}
-    .pnav-link{font-family:var(--mono);font-size:11px;color:var(--text-dim);text-decoration:none;padding:5px 12px;border-radius:var(--r);transition:var(--t);letter-spacing:.04em}
-    .pnav-link:hover{color:var(--text-hi);background:var(--bg2)}
-    .pnav-link.ext{color:var(--amber)}
-    .theme-btn{margin-left:10px;padding:5px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:99px;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--text-dim);transition:var(--t)}
-    .theme-btn:hover{border-color:var(--amber);color:var(--amber)}
-    @media(max-width:640px){.pnav-links{display:none}}
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
 
-    /* LAYOUT */
-    .pcont{max-width:1140px;margin:0 auto;padding:0 32px}
-    @media(max-width:640px){.pcont{padding:0 16px}}
+    /* ── TOP NAV (identity only) ─────────────────────────── */
+    .topnav {
+      position: sticky; top: 0; z-index: 200;
+      height: var(--nav-h);
+      background: rgba(8,9,12,0.95);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 28px;
+      gap: 10px;
+    }
+    [data-theme="light"] .topnav { background: rgba(240,242,247,0.95); }
+    .topnav-brand {
+      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      color: var(--amber); letter-spacing: .06em;
+      text-decoration: none; margin-right: auto;
+    }
+    .topnav-pill {
+      font-family: var(--mono); font-size: 11px;
+      color: var(--text-dim); text-decoration: none;
+      padding: 5px 13px; border: 1px solid var(--border);
+      border-radius: 99px;
+      display: flex; align-items: center; gap: 6px;
+      transition: var(--t); letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .topnav-pill:hover { color: var(--text-hi); border-color: var(--border2); background: var(--bg2); }
+    .theme-btn {
+      padding: 5px 13px; background: transparent;
+      border: 1px solid var(--border); border-radius: 99px;
+      cursor: pointer; font-family: var(--mono); font-size: 11px;
+      color: var(--text-dim); transition: var(--t); white-space: nowrap;
+    }
+    .theme-btn:hover { border-color: var(--amber); color: var(--amber); }
+    @media (max-width: 560px) {
+      .topnav-pill .pill-lbl { display: none; }
+    }
 
-    /* HERO */
-    .hero{padding:72px 0 56px;border-bottom:1px solid var(--border)}
-    .hero-eye{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin-bottom:18px;display:flex;align-items:center;gap:10px}
-    .hero-eye::before{content:'';display:block;width:28px;height:1px;background:var(--amber)}
-    .hero-h{font-family:var(--serif);font-size:clamp(34px,5vw,58px);font-weight:800;color:var(--text-hi);line-height:1.1;letter-spacing:-.02em;margin-bottom:18px}
-    .hero-h span{color:var(--amber)}
-    .hero-sub{font-size:16px;color:var(--text-dim);max-width:560px;line-height:1.7;margin-bottom:36px}
-    .hero-meta{display:flex;gap:36px;flex-wrap:wrap}
-    .hm-item{display:flex;flex-direction:column;gap:3px}
-    .hm-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim)}
-    .hm-val{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text-hi)}
-    .hm-val.g{color:var(--green)}.hm-val.a{color:var(--amber)}
+    /* ── SIDE NAV (section anchors) ──────────────────────── */
+    .sidenav {
+      position: fixed;
+      left: 0; top: var(--nav-h); bottom: 0;
+      width: var(--side-w);
+      z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 4px;
+      border-right: 1px solid var(--border);
+      background: var(--bg1);
+    }
+    .snav-link {
+      position: relative;
+      width: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      padding: 12px 0;
+      text-decoration: none;
+      /* Tooltip */
+    }
+    /* active / hover indicator bar */
+    .snav-link::before {
+      content: '';
+      position: absolute; left: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 2px; height: 0;
+      background: var(--amber);
+      border-radius: 0 2px 2px 0;
+      transition: height .2s ease;
+    }
+    .snav-link:hover::before,
+    .snav-link.active::before { height: 22px; }
+    .snav-num {
+      font-family: var(--mono); font-size: 9px; font-weight: 500;
+      color: var(--text-dim); letter-spacing: .1em;
+      transition: color var(--t);
+    }
+    .snav-pip {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--border2);
+      transition: background var(--t);
+    }
+    .snav-link:hover .snav-num,
+    .snav-link.active .snav-num { color: var(--amber); }
+    .snav-link:hover .snav-pip,
+    .snav-link.active .snav-pip { background: var(--amber); }
+    /* tooltip */
+    .snav-link::after {
+      content: attr(data-label);
+      position: absolute;
+      left: calc(var(--side-w) + 10px);
+      top: 50%; transform: translateY(-50%);
+      background: var(--bg3); border: 1px solid var(--border2);
+      color: var(--text-hi); font-family: var(--mono); font-size: 10px;
+      padding: 4px 10px; border-radius: var(--r);
+      white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity var(--t);
+      letter-spacing: .04em;
+    }
+    .snav-link:hover::after { opacity: 1; }
+    @media (max-width: 800px) {
+      .sidenav { display: none; }
+      .page-wrap { margin-left: 0 !important; }
+    }
 
-    /* SECTIONS */
-    .section{padding:56px 0;border-bottom:1px solid var(--border)}
-    .section:last-of-type{border-bottom:none}
-    .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:32px}
-    .sec-num{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.1em}
-    .sec-title{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--text-hi);letter-spacing:-.01em}
+    /* ── PAGE WRAP ───────────────────────────────────────── */
+    .page-wrap { margin-left: var(--side-w); }
 
-    /* METHOD GRID */
-    .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r3);overflow:hidden}
-    .mcard{background:var(--bg1);padding:22px}
-    .micon{font-size:20px;margin-bottom:10px;display:block}
-    .mlabel{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--amber);margin-bottom:5px}
-    .mtitle{font-size:15px;font-weight:500;color:var(--text-hi);margin-bottom:7px}
-    .mbody{font-size:13px;color:var(--text-dim);line-height:1.65}
-    .mbody code{font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--amber)}
+    /* ── CONTAINER ───────────────────────────────────────── */
+    .pcont { max-width: 1060px; margin: 0 auto; padding: 0 52px; }
+    @media (max-width: 640px) { .pcont { padding: 0 20px; } }
 
-    /* STATS ROW */
-    .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;margin-bottom:28px}
-    .sc{background:var(--bg1);padding:18px 22px}
-    .sc-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim);margin-bottom:6px}
-    .sc-val{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text-hi);line-height:1}
-    .sc-sub{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px}
+    /* ── HERO ────────────────────────────────────────────── */
+    .hero { padding: 80px 0 64px; border-bottom: 1px solid var(--border); }
+    .hero-eye {
+      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      letter-spacing: .2em; text-transform: uppercase;
+      color: var(--amber); margin-bottom: 22px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .hero-eye::before {
+      content: ''; display: block;
+      width: 30px; height: 1px; background: var(--amber);
+    }
+    .hero-h {
+      font-family: var(--serif);
+      font-size: clamp(38px, 5.5vw, 62px);
+      font-weight: 800; color: var(--text-hi);
+      line-height: 1.06; letter-spacing: -.025em;
+      margin-bottom: 22px;
+    }
+    .hero-h em { color: var(--amber); font-style: normal; }
+    .bio {
+      font-size: 16px; color: var(--text);
+      line-height: 1.8;
+      margin-bottom: 48px;
+    }
+    .bio strong { color: var(--text-hi); font-weight: 500; }
 
-    /* HUB CARDS */
-    .hub-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-    @media(max-width:800px){.hub-grid{grid-template-columns:1fr 1fr}}
-    @media(max-width:440px){.hub-grid{grid-template-columns:1fr}}
-    .hcard{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);padding:16px;position:relative;overflow:hidden;transition:border-color var(--t)}
-    .hcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--hub-color)}
-    .hcard:hover{border-color:var(--border2)}
-    .hcard-name{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:6px}
-    .hcard-acc{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1;margin-bottom:3px}
-    .hcard-mae{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
-    .hcard-bar{height:3px;background:var(--bg3);border-radius:2px;margin-top:8px;overflow:hidden}
-    .hcard-bar-fill{height:100%;border-radius:2px;transition:width 1s ease;background:var(--hub-color)}
+    /* Hero stats — individual cards in a row */
+    .hero-stats {
+      display: flex; gap: 12px; flex-wrap: wrap;
+    }
+    .hstat {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 20px 28px;
+      min-width: 130px;
+    }
+    .hstat-label {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .hstat-val {
+      font-family: var(--mono); font-size: 26px;
+      font-weight: 600; color: var(--text-hi); line-height: 1;
+    }
+    .hstat-val.g { color: var(--green); }
+    .hstat-val.a { color: var(--amber); }
+    .hstat-val.b { color: var(--blue); }
+    .hstat-sub {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text-dim); margin-top: 5px;
+    }
 
-    /* LOG BROWSER */
-    .log-browser{display:grid;grid-template-columns:240px 1fr;gap:0;border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;min-height:480px}
-    @media(max-width:760px){.log-browser{grid-template-columns:1fr}}
-    .log-sb{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;max-height:580px}
-    .log-sb-head{padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim);position:sticky;top:0;background:var(--bg1);z-index:1}
-    .log-item{padding:10px 14px;cursor:pointer;transition:background var(--t);border-bottom:1px solid var(--border);border-left:2px solid transparent}
-    .log-item:hover{background:var(--bg2)}
-    .log-item.active{background:var(--amber2);border-left-color:var(--amber)}
-    .log-item-date{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:2px}
-    .log-item-title{font-size:13px;color:var(--text-hi);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .log-detail{background:var(--bg);overflow-y:auto;max-height:580px}
-    .log-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:280px;gap:8px;color:var(--text-dim);font-family:var(--mono);font-size:12px;text-align:center;padding:24px}
+    /* ── SECTIONS ────────────────────────────────────────── */
+    .section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+    .section:last-of-type { border-bottom: none; }
+    .sec-head { margin-bottom: 40px; }
+    .sec-eyebrow {
+      font-family: var(--mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: .2em;
+      color: var(--amber); margin-bottom: 10px;
+    }
+    .sec-title {
+      font-family: var(--serif); font-size: 30px;
+      font-weight: 700; color: var(--text-hi);
+      letter-spacing: -.015em; line-height: 1.1;
+    }
+    .sec-sub {
+      font-size: 14px; color: var(--text-dim);
+      margin-top: 8px; max-width: 520px; line-height: 1.65;
+    }
 
-    /* LOG DETAIL */
-    .ld-inner{padding:24px}
-    .ld-date{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.1em}
-    .ld-title{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--text-hi);margin-bottom:14px;line-height:1.2}
-    .thesis-blk{background:var(--bg2);border-left:2px solid var(--amber);padding:12px 14px;border-radius:0 var(--r2) var(--r2) 0;margin-bottom:16px}
-    .thesis-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:var(--amber);margin-bottom:5px}
-    .thesis-txt{font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap}
-    .review-blk{background:var(--bg2);border-left:2px solid var(--green);padding:12px 14px;border-radius:0 var(--r2) var(--r2) 0;margin-bottom:16px}
-    .review-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:var(--green);margin-bottom:5px}
+    /* ── METHODOLOGY BADGES ──────────────────────────────── */
+    .badge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 780px) { .badge-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .badge-grid { grid-template-columns: 1fr; } }
 
-    /* PRICE TABLE */
-    .hour-pills{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
-    .hpill{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:99px;background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:var(--t)}
-    .hpill.active{background:var(--amber2);border-color:var(--amber);color:var(--amber);font-weight:600}
-    .tbl-wrap{overflow-x:auto}
-    .pmini{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
-    .pmini th{padding:5px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);border-bottom:1px solid var(--border);background:var(--bg2)}
-    .pmini td{padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
-    .pmini tr:last-child td{border-bottom:none}
-    .pmini tr:hover td{background:var(--bg2)}
-    .num{text-align:right}
-    .hcol{display:flex;align-items:center;gap:6px}
-    .hdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
-    .p-neg{color:var(--blue)}.p-low{color:var(--green)}.p-mid{color:var(--amber)}.p-high{color:var(--red)}.p-spike{color:var(--purple);font-weight:700}
-    .ab{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 6px;border-radius:3px;border:1px solid}
-    .ab-great{color:var(--green);border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.08)}
-    .ab-good{color:#86efac;border-color:rgba(134,239,172,.3);background:rgba(134,239,172,.08)}
-    .ab-ok{color:var(--amber);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)}
-    .ab-poor{color:var(--red);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
-    .ab-na{color:var(--text-dim);border-color:var(--border);background:transparent}
-    .dpos{color:var(--red)}.dneg{color:var(--green)}.dzero{color:var(--text-dim)}
+    .mbadge {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r3);
+      padding: 28px 26px 24px;
+      display: flex; flex-direction: column; gap: 9px;
+      position: relative; overflow: hidden;
+      transition: border-color var(--t), box-shadow var(--t);
+    }
+    .mbadge:hover {
+      border-color: var(--badge-c, var(--amber));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--badge-c, var(--amber)) 20%, transparent);
+    }
+    /* top accent bar */
+    .mbadge::before {
+      content: ''; position: absolute;
+      top: 0; left: 24px; right: 24px; height: 2px;
+      background: var(--badge-c, var(--amber));
+      border-radius: 0 0 2px 2px;
+    }
+    .mbadge-icon { font-size: 20px; line-height: 1; margin-bottom: 2px; }
+    .mbadge-label {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--badge-c, var(--amber)); font-weight: 500;
+    }
+    .mbadge-title {
+      font-size: 14px; font-weight: 600;
+      color: var(--text-hi); line-height: 1.25;
+    }
+    .mbadge-body {
+      font-size: 12.5px; color: var(--text-dim);
+      line-height: 1.65; flex: 1;
+    }
+    .mbadge-body code {
+      font-family: var(--mono); font-size: 10.5px;
+      background: var(--bg3); padding: 1px 5px;
+      border-radius: 4px; color: var(--badge-c, var(--amber));
+    }
 
-    /* MISC */
-    .tag-p{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:99px;border:1px solid;opacity:.85}
-    .skel{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:var(--r)}
-    @keyframes sk{0%{background-position:200%}100%{background-position:-200%}}
-    .pfooter{padding:36px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-dim);border-top:1px solid var(--border)}
-    .pfooter a{color:var(--amber);text-decoration:none}
-    .pfooter a:hover{text-decoration:underline}
+    /* ── STATS CARDS ─────────────────────────────────────── */
+    /* Individual cards — no fused background */
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 700px) { .stats-cards { grid-template-columns: 1fr 1fr; } }
+    .sc {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 22px 24px;
+    }
+    .sc-label {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .sc-val {
+      font-family: var(--mono); font-size: 26px;
+      font-weight: 600; color: var(--text-hi); line-height: 1;
+    }
+    .sc-sub {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text-dim); margin-top: 5px;
+    }
+
+    /* ── HUB CARDS ───────────────────────────────────────── */
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 780px) { .hub-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 440px) { .hub-grid { grid-template-columns: 1fr; } }
+    .hcard {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 20px 18px;
+      position: relative; overflow: hidden;
+      transition: border-color var(--t);
+    }
+    .hcard::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: var(--hub-color);
+    }
+    .hcard:hover { border-color: var(--border2); }
+    .hcard-name {
+      font-family: var(--mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--text-dim); margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .hcard-acc {
+      font-family: var(--mono); font-size: 28px;
+      font-weight: 600; line-height: 1; margin-bottom: 4px;
+    }
+    .hcard-mae { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+    .hcard-bar {
+      height: 3px; background: var(--bg3);
+      border-radius: 2px; margin-top: 12px; overflow: hidden;
+    }
+    .hcard-bar-fill {
+      height: 100%; border-radius: 2px;
+      transition: width 1s ease;
+      background: var(--hub-color);
+    }
+
+    /* ── LOG BROWSER ─────────────────────────────────────── */
+    .log-browser {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      border: 1px solid var(--border);
+      border-radius: var(--r3);
+      overflow: hidden; min-height: 500px;
+    }
+    @media (max-width: 720px) { .log-browser { grid-template-columns: 1fr; } }
+    .log-sb {
+      background: var(--bg1);
+      border-right: 1px solid var(--border);
+      overflow-y: auto; max-height: 620px;
+    }
+    .log-sb-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--text-dim);
+      position: sticky; top: 0;
+      background: var(--bg1); z-index: 1;
+    }
+    .log-item {
+      padding: 12px 16px; cursor: pointer;
+      transition: background var(--t);
+      border-bottom: 1px solid var(--border);
+      border-left: 2px solid transparent;
+    }
+    .log-item:hover { background: var(--bg2); }
+    .log-item.active { background: var(--amber2); border-left-color: var(--amber); }
+    .log-item-date {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text-dim); margin-bottom: 3px;
+    }
+    .log-item-title {
+      font-size: 13px; color: var(--text-hi); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .log-item-src {
+      font-family: var(--mono); font-size: 9px;
+      color: var(--text-dim); margin-top: 4px; opacity: .55;
+    }
+    .log-detail { background: var(--bg); overflow-y: auto; max-height: 620px; }
+    .log-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; min-height: 300px;
+      gap: 10px; color: var(--text-dim);
+      font-family: var(--mono); font-size: 12px;
+      text-align: center; padding: 32px;
+    }
+
+    /* ── LOG DETAIL ──────────────────────────────────────── */
+    .ld-inner { padding: 28px 32px; }
+    .ld-date {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text-dim); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: .1em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .ld-src-badge {
+      font-family: var(--mono); font-size: 9px;
+      padding: 2px 8px; border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--text-dim); letter-spacing: .08em;
+    }
+    .ld-title {
+      font-family: var(--serif); font-size: 22px;
+      font-weight: 700; color: var(--text-hi);
+      margin-bottom: 14px; line-height: 1.2;
+    }
+    .thesis-blk {
+      background: var(--bg2);
+      border-left: 2px solid var(--amber);
+      padding: 14px 18px;
+      border-radius: 0 var(--r2) var(--r2) 0;
+      margin-bottom: 16px;
+    }
+    .thesis-lbl {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--amber); margin-bottom: 6px;
+    }
+    .thesis-txt { font-size: 13px; line-height: 1.75; color: var(--text); white-space: pre-wrap; }
+    .review-blk {
+      background: var(--bg2);
+      border-left: 2px solid var(--green);
+      padding: 14px 18px;
+      border-radius: 0 var(--r2) var(--r2) 0;
+      margin-bottom: 16px;
+    }
+    .review-lbl {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--green); margin-bottom: 6px;
+    }
+
+    /* ── LEGACY BLOCKS ───────────────────────────────────── */
+    .legacy-blocks { display: flex; flex-direction: column; gap: 12px; }
+    .lblock {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r2); overflow: hidden;
+    }
+    .lblock-header {
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+      background: var(--bg3); display: flex; align-items: center; gap: 8px;
+    }
+    .lblock-label {
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .14em; color: var(--amber);
+    }
+    .lblock-body { padding: 14px 16px; font-size: 13px; line-height: 1.7; color: var(--text); }
+    .lblock-body img { max-width: 100%; height: auto; border-radius: var(--r); margin: 6px 0; display: block; border: 1px solid var(--border); }
+    .lblock-body a { color: var(--blue); text-decoration: none; }
+    .lblock-body a:hover { text-decoration: underline; }
+    .lblock-img-wrap { padding: 14px 16px; }
+    .lblock-img-wrap img { max-width: 100%; border-radius: var(--r); display: block; }
+    .lblock-img-caption { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 7px; font-style: italic; }
+
+    /* ── NOTES SECTION ───────────────────────────────────── */
+    .notes-grid {
+      display: grid; grid-template-columns: 240px 1fr;
+      border: 1px solid var(--border); border-radius: var(--r3);
+      overflow: hidden; min-height: 420px;
+    }
+    @media (max-width: 720px) { .notes-grid { grid-template-columns: 1fr; } }
+    .notes-sb {
+      background: var(--bg1); border-right: 1px solid var(--border);
+      overflow-y: auto; max-height: 540px;
+    }
+    .notes-sb-head {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      font-family: var(--mono); font-size: 9px;
+      text-transform: uppercase; letter-spacing: .16em;
+      color: var(--text-dim);
+      position: sticky; top: 0; background: var(--bg1); z-index: 1;
+    }
+    .note-item {
+      padding: 12px 16px; cursor: pointer;
+      transition: background var(--t);
+      border-bottom: 1px solid var(--border);
+      border-left: 2px solid transparent;
+    }
+    .note-item:hover { background: var(--bg2); }
+    .note-item.active { background: var(--amber2); border-left-color: var(--amber); }
+    .note-item-date { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-bottom: 3px; }
+    .note-item-title { font-size: 13px; color: var(--text-hi); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .note-item-kind {
+      display: inline-block; font-family: var(--mono); font-size: 9px;
+      padding: 2px 7px; border-radius: 99px; margin-top: 4px;
+      border: 1px solid; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .kind-note    { color: var(--blue);   border-color: rgba(96,165,250,.3);  background: rgba(96,165,250,.07);  }
+    .kind-strategy{ color: var(--purple); border-color: rgba(167,139,250,.3); background: rgba(167,139,250,.07); }
+    .notes-detail { background: var(--bg); overflow-y: auto; max-height: 540px; }
+    .notes-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; min-height: 280px;
+      gap: 10px; color: var(--text-dim);
+      font-family: var(--mono); font-size: 12px;
+      text-align: center; padding: 32px;
+    }
+    .nd-inner { padding: 28px 32px; }
+    .nd-meta {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--text-dim); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: .1em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .nd-title { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--text-hi); margin-bottom: 16px; line-height: 1.2; }
+    .nd-body { font-size: 14px; line-height: 1.8; color: var(--text); }
+    .nd-body img { max-width: 100%; border-radius: var(--r); margin: 10px 0; display: block; }
+    .nd-body p { margin: 0 0 12px; }
+    .nd-body b, .nd-body strong { color: var(--text-hi); font-weight: 600; }
+
+    /* ── PRICE TABLE ─────────────────────────────────────── */
+    .hour-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .hpill {
+      font-family: var(--mono); font-size: 10px;
+      padding: 4px 12px; border-radius: 99px;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text-dim); cursor: pointer; transition: var(--t);
+    }
+    .hpill.active { background: var(--amber2); border-color: var(--amber); color: var(--amber); font-weight: 600; }
+    .tbl-wrap { overflow-x: auto; }
+    .pmini { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+    .pmini th {
+      padding: 7px 10px; text-align: left; font-size: 9px;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--text-dim); border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .pmini td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .pmini tr:last-child td { border-bottom: none; }
+    .pmini tr:hover td { background: var(--bg2); }
+    .num { text-align: right; }
+    .hcol { display: flex; align-items: center; gap: 7px; }
+    .hdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .p-neg   { color: var(--blue);   }
+    .p-low   { color: var(--green);  }
+    .p-mid   { color: var(--amber);  }
+    .p-high  { color: var(--red);    }
+    .p-spike { color: var(--purple); font-weight: 700; }
+    .ab { font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; border: 1px solid; }
+    .ab-great { color: var(--green);  border-color: rgba(52,211,153,.3);  background: rgba(52,211,153,.08);  }
+    .ab-good  { color: #6ee7b7;       border-color: rgba(110,231,183,.3); background: rgba(110,231,183,.08); }
+    .ab-ok    { color: var(--amber);  border-color: rgba(245,166,35,.3);  background: rgba(245,166,35,.08);  }
+    .ab-poor  { color: var(--red);    border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.08); }
+    .ab-na    { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .dpos { color: var(--red);      }
+    .dneg { color: var(--green);    }
+    .dzero{ color: var(--text-dim); }
+
+    /* ── MISC ────────────────────────────────────────────── */
+    .tag-p {
+      font-family: var(--mono); font-size: 10px;
+      padding: 2px 8px; border-radius: 99px; border: 1px solid; opacity: .85;
+    }
+    .skel {
+      background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+      background-size: 200% 100%;
+      animation: sk 1.4s infinite; border-radius: var(--r);
+    }
+    @keyframes sk { 0%{background-position:200%} 100%{background-position:-200%} }
+
+    /* ── FOOTER ──────────────────────────────────────────── */
+    .pfooter {
+      padding: 44px 0 36px;
+      text-align: center;
+      font-family: var(--mono); font-size: 11px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+    .pfooter a { color: var(--amber); text-decoration: none; }
+    .pfooter a:hover { text-decoration: underline; }
+    .pfooter-row { margin-top: 8px; }
+
+    /* ── ANIMATIONS ──────────────────────────────────────── */
+
+    /* Keyframes */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-22px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(22px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    /* used for panel content swaps */
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Hero — animate on load */
+    .hero-eye  { animation: fadeUp .5s ease both; animation-delay: .05s; }
+    .hero-h    { animation: fadeUp .5s ease both; animation-delay: .15s; }
+    .bio       { animation: fadeUp .5s ease both; animation-delay: .25s; }
+    .hero-stats{ animation: fadeUp .5s ease both; animation-delay: .35s; }
+
+    /* Scroll-reveal base state — elements start hidden */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .45s ease, transform .45s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Badges slide in from left/right alternating */
+    .mbadge.reveal       { transform: translateX(-20px); }
+    .mbadge.reveal.visible { transform: translateX(0); }
+    /* even-indexed badges come from right */
+    .mbadge.reveal-r       { opacity: 0; transform: translateX(20px); transition: opacity .45s ease, transform .45s ease; }
+    .mbadge.reveal-r.visible { opacity: 1; transform: translateX(0); }
+
+    /* Badges slide in right-to-left (all, no alternating) */
+    .mbadge.reveal, .mbadge.reveal-r {
+      opacity: 0;
+      transform: translateX(24px);
+      transition: opacity .4s ease, transform .4s ease, border-color var(--t), box-shadow var(--t);
+    }
+    .mbadge.reveal.visible, .mbadge.reveal-r.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    /* Badge hover lift */
+    .mbadge {
+      transform: translateY(0);
+      transition: border-color var(--t), box-shadow var(--t), transform .2s ease;
+    }
+    .mbadge.reveal.visible:hover, .mbadge.reveal-r.visible:hover,
+    .mbadge:not(.reveal):not(.reveal-r):hover {
+      transform: translateY(-3px);
+      border-color: var(--badge-c, var(--amber));
+      box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--badge-c, var(--amber)) 25%, transparent);
+    }
+
+    /* Hub cards — right-to-left, JS-observed after inject */
+    .hcard {
+      opacity: 0;
+      transform: translateX(20px);
+      transition: opacity .4s ease, transform .4s ease, border-color var(--t), box-shadow var(--t);
+    }
+    .hcard.visible { opacity: 1; transform: translateX(0); }
+    .hcard.visible:hover { transform: translateY(-2px); box-shadow: 0 6px 20px -6px rgba(0,0,0,.3); }
+    .hcard:nth-child(1) { transition-delay: .00s; }
+    .hcard:nth-child(2) { transition-delay: .07s; }
+    .hcard:nth-child(3) { transition-delay: .12s; }
+    .hcard:nth-child(4) { transition-delay: .17s; }
+    .hcard:nth-child(5) { transition-delay: .22s; }
+
+    /* Stat cards — right-to-left, JS-observed after inject */
+    .sc {
+      opacity: 0;
+      transform: translateX(18px);
+      transition: opacity .38s ease, transform .38s ease, border-color var(--t);
+    }
+    .sc.visible { opacity: 1; transform: translateX(0); }
+    .sc.visible:hover { border-color: var(--border2); }
+    .sc:nth-child(1) { transition-delay: .00s; }
+    .sc:nth-child(2) { transition-delay: .07s; }
+    .sc:nth-child(3) { transition-delay: .14s; }
+    .sc:nth-child(4) { transition-delay: .21s; }
+
+    /* Panel swap animation (log detail + notes detail) */
+    .panel-enter {
+      animation: panelIn .25s ease both;
+    }
+
+    /* Section head fade-up */
+    .sec-head.reveal { transform: translateY(16px); }
+
   </style>
 </head>
 <body>
 
-<nav class="pnav">
-  <a class="pnav-brand" href="portfolio.html">KM / ERCOT</a>
-  <div class="pnav-links">
-    <a class="pnav-link" href="#methodology">Method</a>
-    <a class="pnav-link" href="#accuracy">Accuracy</a>
-    <a class="pnav-link" href="#log">Forecast Log</a>
-    <a class="pnav-link ext" href="index.html">Live Dashboard →</a>
-  </div>
+<!-- ── TOP NAV ────────────────────────────────────────────── -->
+<nav class="topnav">
+  <a class="topnav-brand" href="portfolio.html">KM&nbsp;/&nbsp;ERCOT</a>
+  <a class="topnav-pill" href="https://www.linkedin.com/in/kevinmaresca" target="_blank" rel="noopener">
+    <span>💼</span><span class="pill-lbl">LinkedIn</span>
+  </a>
+  <a class="topnav-pill" href="mailto:kevin.maresca@gmail.com">
+    <span>✉️</span><span class="pill-lbl">Email</span>
+  </a>
   <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
 </nav>
 
-<!-- HERO -->
-<section class="hero">
+<!-- ── SIDE NAV ───────────────────────────────────────────── -->
+<nav class="sidenav" id="sidenav">
+  <a class="snav-link" href="#hero"        data-section="hero"        data-label="Overview">
+    <span class="snav-num">00</span><span class="snav-pip"></span>
+  </a>
+  <a class="snav-link" href="#methodology" data-section="methodology" data-label="Methodology">
+    <span class="snav-num">01</span><span class="snav-pip"></span>
+  </a>
+  <a class="snav-link" href="#accuracy"    data-section="accuracy"    data-label="Track Record">
+    <span class="snav-num">02</span><span class="snav-pip"></span>
+  </a>
+  <a class="snav-link" href="#log"         data-section="log"         data-label="Forecast Log">
+    <span class="snav-num">03</span><span class="snav-pip"></span>
+  </a>
+  <a class="snav-link" href="#notes"       data-section="notes"       data-label="Notes">
+    <span class="snav-num">04</span><span class="snav-pip"></span>
+  </a>
+</nav>
+
+<div class="page-wrap">
+
+<!-- ── HERO ──────────────────────────────────────────────── -->
+<section class="hero" id="hero">
   <div class="pcont">
-    <div class="hero-eye">Independent Research · ERCOT · Texas Power Markets</div>
-    <h1 class="hero-h">Day-Ahead LMP<br><span>Forecast Journal</span></h1>
-    <p class="hero-sub">
-      Daily price predictions across five ERCOT settlement hubs — energy component (system λ),
-      congestion, and total SPP forecast — tracked against settlement with structured reasoning on every call.
+    <div class="hero-eye">Independent Research &middot; ERCOT &middot; Texas Power Markets</div>
+    <h1 class="hero-h">Day-Ahead LMP<br><em>Forecast Journal</em></h1>
+    <p class="bio">
+      I'm <strong>Kevin Maresca</strong>, a self-taught energy market analyst building toward a career in power trading.
+      I built this journal to develop a rigorous daily practice: every morning I write a market thesis,
+      decompose prices into energy and congestion components across five ERCOT hubs, and track my predictions against settlement.
+      Every evening I write a post-mortem on what I got right and wrong.
     </p>
-    <div class="hero-meta">
-      <div class="hm-item"><span class="hm-label">Forecast Days</span><span class="hm-val a" id="s-days">—</span></div>
-      <div class="hm-item"><span class="hm-label">Overall Accuracy</span><span class="hm-val g" id="s-acc">—</span></div>
-      <div class="hm-item"><span class="hm-label">Mean Abs. Error</span><span class="hm-val" id="s-mae">—</span></div>
-      <div class="hm-item"><span class="hm-label">Graded Forecasts</span><span class="hm-val" id="s-n">—</span></div>
+    <div class="hero-stats">
+      <div class="hstat">
+        <div class="hstat-label">Forecast Days</div>
+        <div class="hstat-val a" id="s-days">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Overall Accuracy</div>
+        <div class="hstat-val g" id="s-acc">—</div>
+        <div class="hstat-sub" id="s-acc-sub"></div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Mean Abs. Error</div>
+        <div class="hstat-val" id="s-mae">—</div>
+        <div class="hstat-sub">$/MWh avg miss</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Beats Day Ahead Market</div>
+        <div class="hstat-val b" id="s-beats">—</div>
+        <div class="hstat-sub">of forecasts</div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- METHODOLOGY -->
+<!-- ── METHODOLOGY ────────────────────────────────────────── -->
 <section class="section" id="methodology">
   <div class="pcont">
-    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Methodology</h2></div>
-    <div class="mgrid">
-      <div class="mcard"><span class="micon">⚡</span><div class="mlabel">Price Structure</div><div class="mtitle">LMP Decomposition</div><div class="mbody">Each forecast decomposes settlement point price into <code>λ (energy + losses)</code> and <code>congestion</code>. System lambda is forecast once per hour slot and applied statewide; congestion is forecast per hub based on local topology and outage conditions.</div></div>
-      <div class="mcard"><span class="micon">🗺</span><div class="mlabel">Coverage</div><div class="mtitle">Five ERCOT Hubs</div><div class="mbody">Forecasts cover <code>HB_NORTH</code> (Dallas), <code>HB_HOUSTON</code>, <code>HB_SOUTH</code> (San Antonio), <code>HB_WEST</code> (Midland), and <code>HB_PAN</code> (Panhandle) at four daily hour slots: 7 AM, 12 PM, 5 PM, and 10 PM CPT.</div></div>
-      <div class="mcard"><span class="micon">☀️</span><div class="mlabel">Process</div><div class="mtitle">Morning Thesis First</div><div class="mbody">Each day begins with a written market thesis — wind outlook, demand forecast, temperature drivers, transmission outages — before any prices are entered. Reasoning is documented separately from the numbers.</div></div>
-      <div class="mcard"><span class="micon">📡</span><div class="mlabel">Data Sources</div><div class="mtitle">ERCOT CDR Reports</div><div class="mbody">DAM and RT settlement prices are pulled from ERCOT's CDR HTML reports via a local Node.js sync tool. The <code>Interval Ending :00</code> value is used as the HE representative price, matching ERCOT's dashboard display.</div></div>
-      <div class="mcard"><span class="micon">📐</span><div class="mlabel">Scoring</div><div class="mtitle">DAM-Relative Accuracy</div><div class="mbody">Score = 60% delta-based (anchored at $50/MWh reference) + 40% vs-DAM component. Beating the DAM directionally earns a bonus. Matching DAM scores ~50. Doing worse than DAM scores lower. Clamped 0–100.</div></div>
-      <div class="mcard"><span class="micon">🌙</span><div class="mlabel">Review</div><div class="mtitle">Evening Post-Mortem</div><div class="mbody">After RT settles, each day gets an evening review: what drove the market, where the thesis was right or wrong, what would have changed the call. Congestion accuracy tracked separately from energy.</div></div>
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">01 &mdash; Methodology</div>
+      <h2 class="sec-title">How I Build Each Forecast</h2>
+    </div>
+    <div class="badge-grid">
+
+      <div class="mbadge reveal" style="--badge-c:var(--blue)">
+        <span class="mbadge-icon">⚡</span>
+        <span class="mbadge-label">Price Structure</span>
+        <div class="mbadge-title">LMP Decomposition</div>
+        <div class="mbadge-body">Each forecast splits the settlement point price into <code>λ energy</code> and <code>congestion</code>. System lambda is forecast once per hour slot statewide; congestion is forecast per hub based on local topology and known outages.</div>
+      </div>
+
+      <div class="mbadge reveal-r" style="--badge-c:var(--green)">
+        <span class="mbadge-icon">🗺</span>
+        <span class="mbadge-label">Coverage</span>
+        <div class="mbadge-title">Five ERCOT Hubs</div>
+        <div class="mbadge-body"><code>HB_NORTH</code> Dallas &middot; <code>HB_HOUSTON</code> &middot; <code>HB_SOUTH</code> San Antonio &middot; <code>HB_WEST</code> Midland &middot; <code>HB_PAN</code> Panhandle &mdash; at 4 daily hour slots: 7 AM, 12 PM, 5 PM, 10 PM CPT.</div>
+      </div>
+
+      <div class="mbadge reveal" style="--badge-c:var(--amber)">
+        <span class="mbadge-icon">☀️</span>
+        <span class="mbadge-label">Process</span>
+        <div class="mbadge-title">Morning Thesis First</div>
+        <div class="mbadge-body">Wind generation outlook, demand forecast, temperature drivers, and known transmission outages are documented before any prices are entered. Reasoning lives separately from the numbers.</div>
+      </div>
+
+      <div class="mbadge reveal-r" style="--badge-c:var(--purple)">
+        <span class="mbadge-icon">📡</span>
+        <span class="mbadge-label">Data</span>
+        <div class="mbadge-title">ERCOT CDR Reports</div>
+        <div class="mbadge-body">DAM and RT settlement prices are pulled from ERCOT's CDR HTML reports via a Node.js sync tool. The <code>Interval Ending :00</code> row is used as the HE representative price — matching ERCOT's dashboard display.</div>
+      </div>
+
+      <div class="mbadge reveal" style="--badge-c:var(--red)">
+        <span class="mbadge-icon">📐</span>
+        <span class="mbadge-label">Scoring</span>
+        <div class="mbadge-title">DAM-Relative Accuracy</div>
+        <div class="mbadge-body">Score = 60% delta-based (anchored at $50/MWh) + 40% vs-DAM. Beating the DAM earns a bonus. The benchmark isn't perfection — it's whether I'm adding signal beyond what the market already priced in.</div>
+      </div>
+
+      <div class="mbadge reveal-r" style="--badge-c:var(--green)">
+        <span class="mbadge-icon">🌙</span>
+        <span class="mbadge-label">Review</span>
+        <div class="mbadge-title">Evening Post-Mortem</div>
+        <div class="mbadge-body">After RT settles, each day gets a written review: what drove the market, where the thesis was right or wrong, and what would have changed the call. Congestion accuracy is tracked separately from energy.</div>
+      </div>
+
     </div>
   </div>
 </section>
 
-<!-- ACCURACY -->
+<!-- ── TRACK RECORD ───────────────────────────────────────── -->
 <section class="section" id="accuracy">
   <div class="pcont">
-    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">Track Record</h2></div>
-    <div class="stats-row" id="stats-row">
-      <div class="sc"><div class="sc-label">Loading</div><div class="skel" style="height:24px;margin-top:8px"></div></div>
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">02 &mdash; Track Record</div>
+      <h2 class="sec-title">Accuracy by Hub</h2>
     </div>
-    <div class="hub-grid" id="hub-grid">
-      <!-- built by JS -->
+    <div class="stats-cards" id="stats-row">
+      <div class="sc"><div class="sc-label">Loading&hellip;</div><div class="skel" style="height:24px;margin-top:10px"></div></div>
     </div>
+    <div class="hub-grid" id="hub-grid"></div>
   </div>
 </section>
 
-<!-- FORECAST LOG -->
+<!-- ── FORECAST LOG ───────────────────────────────────────── -->
 <section class="section" id="log">
   <div class="pcont">
-    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Forecast Log</h2></div>
-    <p style="color:var(--text-dim);font-size:14px;margin-bottom:22px;max-width:540px">Browse daily entries to read the morning thesis, price predictions, and evening review. Each entry shows the reasoning chain — not just the numbers.</p>
-    <div class="log-browser">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">03 &mdash; Forecast Log</div>
+      <h2 class="sec-title">Daily Entries</h2>
+      <p class="sec-sub">Browse the morning thesis, price predictions, and evening review for each day. Legacy entries show raw analysis notes and charts exactly as written.</p>
+    </div>
+    <div class="log-browser reveal">
       <div class="log-sb">
         <div class="log-sb-head">Recent Days</div>
-        <div id="log-list"><div style="padding:14px"><div class="skel" style="margin-bottom:10px"></div><div class="skel" style="margin-bottom:10px;width:70%"></div><div class="skel"></div></div></div>
+        <div id="log-list">
+          <div style="padding:16px">
+            <div class="skel" style="height:14px;margin-bottom:10px"></div>
+            <div class="skel" style="height:14px;margin-bottom:10px;width:75%"></div>
+            <div class="skel" style="height:14px"></div>
+          </div>
+        </div>
       </div>
       <div class="log-detail" id="log-detail">
-        <div class="log-empty"><span style="font-size:22px;opacity:.2">←</span>Select a day to read the forecast</div>
+        <div class="log-empty">
+          <span style="font-size:24px;opacity:.15">&#8592;</span>
+          Select a day to read the forecast
+        </div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- ── NOTES & LEARNING ───────────────────────────────────── -->
+<section class="section" id="notes">
+  <div class="pcont">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">04 &mdash; Notes &amp; Learning</div>
+      <h2 class="sec-title">Market Reflections</h2>
+      <p class="sec-sub">Pattern observations, lessons learned, and trading strategies — written outside the daily forecast cycle.</p>
+    </div>
+    <div class="notes-grid reveal">
+      <div class="notes-sb">
+        <div class="notes-sb-head">All Notes</div>
+        <div id="notes-list">
+          <div style="padding:16px">
+            <div class="skel" style="height:14px;margin-bottom:10px"></div>
+            <div class="skel" style="height:14px;margin-bottom:10px;width:75%"></div>
+            <div class="skel" style="height:14px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-detail" id="notes-detail">
+        <div class="notes-empty">
+          <span style="font-size:24px;opacity:.15">&#8592;</span>
+          Select a note to read
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────────────────── -->
 <footer class="pfooter">
   <div class="pcont">
-    <p>Kevin Maresca · Independent ERCOT Market Analysis · <a href="index.html">Live Dashboard →</a></p>
-    <p style="margin-top:5px;opacity:.45">Supabase · ERCOT CDR Data · Open-Meteo Weather · GitHub Pages</p>
+    <p>Kevin Maresca &middot; Independent ERCOT Market Analysis</p>
+    <p class="pfooter-row">
+      <a href="https://www.linkedin.com/in/kevin-maresca-565369251/" target="_blank" rel="noopener">LinkedIn</a>
+      &nbsp;&middot;&nbsp;
+      <a href="mailto:kevin.maresca@gmail.com">kevin.maresca@gmail.com</a>
+    </p>
+    <p class="pfooter-row" style="margin-top:8px;opacity:.35">Supabase &middot; ERCOT CDR &middot; Open-Meteo &middot; GitHub Pages</p>
   </div>
 </footer>
+
+</div><!-- /page-wrap -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/db.js"></script>
 <script src="js/ui.js"></script>
+
+<!-- Animation + scroll-spy -->
 <script>
-// ── Theme ────────────────────────────────────────────────
+(function(){
+  /* ── Side nav scroll spy ───────────────────────── */
+  const links    = document.querySelectorAll('.snav-link');
+  const sections = Array.from(links)
+    .map(l => document.getElementById(l.dataset.section))
+    .filter(Boolean);
+  function updateNav(){
+    let active = sections[0];
+    sections.forEach(s => { if(window.scrollY + 140 >= s.offsetTop) active = s; });
+    links.forEach(l => l.classList.toggle('active', l.dataset.section === active?.id));
+  }
+  window.addEventListener('scroll', updateNav, {passive:true});
+  updateNav();
+
+  /* ── Scroll-reveal (IntersectionObserver) ──────── */
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        e.target.classList.add('visible');
+        revealObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
+
+  function observeAll(){
+    document.querySelectorAll('.reveal, .reveal-r, .hcard:not(.observed), .sc:not(.observed)').forEach(el => {
+      el.classList.add('observed');
+      revealObs.observe(el);
+    });
+  }
+
+  // Observe static elements immediately
+  observeAll();
+
+  // Re-observe after JS injects dynamic cards (hub grid + stats cards)
+  window.observeNewCards = observeAll;
+
+  /* ── Panel animation helper (called by JS on entry swap) */
+  window.panelAnimate = function(el){
+    if(!el) return;
+    el.classList.remove('panel-enter');
+    // force reflow so removing+adding the class triggers the animation
+    void el.offsetWidth;
+    el.classList.add('panel-enter');
+  };
+})();
+</script>
+
+<script>
+// ── Theme ─────────────────────────────────────────────────
 function toggleTheme(){
   const cur=document.documentElement.getAttribute('data-theme')||'dark';
   const next=cur==='dark'?'light':'dark';
@@ -252,14 +1003,13 @@ function toggleTheme(){
   document.getElementById('theme-btn').textContent=t==='light'?'🌙 Dark':'☀️ Light';
 })();
 
-// ── Helpers ──────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fmtP(v){
   if(v===null||v===undefined)return'—';
   const n=parseFloat(v);if(isNaN(n))return'—';
   const tier=APP.priceTier(n);
-  const fmt=(n<0?'-$':'$')+Math.abs(n).toFixed(2);
-  return`<span class="p-${tier}">${fmt}</span>`;
+  return`<span class="p-${tier}">${(n<0?'-$':'$')+Math.abs(n).toFixed(2)}</span>`;
 }
 function fmtAcc(n){
   if(n===null||n===undefined)return'<span class="ab ab-na">—</span>';
@@ -269,42 +1019,99 @@ function fmtAcc(n){
 function hdot(id){const h=APP.hubById(id);return`<span class="hdot" style="background:${h?.color??'#666'}"></span>`}
 function pcls(n){return n>=90?'great':n>=75?'good':n>=55?'ok':'poor'}
 
-// ── Stats ────────────────────────────────────────────────
+// ── Stats — compute "beats DAM" rate from raw rows ────────
+// We re-fetch hub_forecasts with dam_price + actuals and tally
+// how often |pred - actual| <= |dam - actual|.
 async function loadStats(){
-  const stats=await DB.getAccuracyStats({days:365});
-  document.getElementById('s-days').textContent=stats.sampleSize?Math.ceil(stats.sampleSize/20)+'+':('—');
-  document.getElementById('s-acc').textContent=stats.overall!==null?stats.overall+'%':'—';
-  document.getElementById('s-mae').textContent=stats.mae!==null?'$'+stats.mae.toFixed(2):'—';
-  document.getElementById('s-n').textContent=stats.sampleSize||'—';
+  // getAccuracyStats already queries all the right rows
+  const stats = await DB.getAccuracyStats({days:365}).catch(()=>null);
 
+  // Also compute beats-DAM rate from a direct query on sbNew
+  let beatsRate = null;
+  try {
+    const { data } = await sbNew
+      .from('hub_forecasts')
+      .select('pred_energy, pred_congestion, actual_energy, dam_price')
+      .not('actual_energy','is',null)
+      .not('pred_energy','is',null)
+      .not('dam_price','is',null);
+    if(data && data.length){
+      let beats=0, total=0;
+      data.forEach(r=>{
+        const predTotal = (r.pred_energy!=null && r.pred_congestion!=null)
+          ? r.pred_energy + r.pred_congestion : r.pred_energy;
+        const result = APP.beatsDam(predTotal, r.actual_energy, r.dam_price);
+        if(result !== null){ total++; if(result) beats++; }
+      });
+      if(total>0) beatsRate = Math.round((beats/total)*100)+'%';
+    }
+  } catch(e){}
+
+  if(!stats){
+    document.getElementById('stats-row').innerHTML='<div class="sc"><div class="sc-label">Loading data…</div><div class="sc-sub">No graded forecasts yet</div></div>';
+    if(beatsRate) document.getElementById('s-beats').textContent=beatsRate;
+    return;
+  }
+
+  // Hero stats
+  document.getElementById('s-days').textContent = stats.sampleSize ? Math.ceil(stats.sampleSize/20)+'+' : '—';
+  document.getElementById('s-acc').textContent   = stats.overall!==null ? stats.overall+'%' : '—';
+  document.getElementById('s-acc-sub').textContent = stats.overall!==null
+    ? (stats.overall>=80?'ahead of DAM':stats.overall>=65?'tracking':'building') : '';
+  document.getElementById('s-mae').textContent   = stats.mae!==null ? '$'+stats.mae.toFixed(2) : '—';
+  document.getElementById('s-beats').textContent = beatsRate ?? '—';
+
+  // Stats row — replace Congestion Acc with Beats DAM rate
   document.getElementById('stats-row').innerHTML=`
-    <div class="sc"><div class="sc-label">Overall Accuracy</div><div class="sc-val" style="color:var(--green)">${stats.overall??'—'}${stats.overall!==null?'%':''}</div><div class="sc-sub">${stats.sampleSize} graded forecasts</div></div>
-    <div class="sc"><div class="sc-label">Mean Abs. Error</div><div class="sc-val">${stats.mae!==null?'$'+stats.mae.toFixed(2):'—'}</div><div class="sc-sub">$/MWh average miss</div></div>
-    <div class="sc"><div class="sc-label">Congestion Acc.</div><div class="sc-val">${stats.congestion!==null?stats.congestion+'%':'—'}</div><div class="sc-sub">${stats.congestionSampleSize||0} graded</div></div>
-    <div class="sc"><div class="sc-label">Scoring</div><div class="sc-val" style="font-size:14px;color:var(--amber)">DAM-Relative</div><div class="sc-sub">Beats DAM = bonus</div></div>`;
+    <div class="sc">
+      <div class="sc-label">Overall Accuracy</div>
+      <div class="sc-val" style="color:var(--green)">${stats.overall!==null?stats.overall+'%':'—'}</div>
+      <div class="sc-sub">${stats.sampleSize} graded forecasts</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Mean Abs. Error</div>
+      <div class="sc-val">${stats.mae!==null?'$'+stats.mae.toFixed(2):'—'}</div>
+      <div class="sc-sub">$/MWh average miss</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Beats Day Ahead Market (DAM)</div>
+      <div class="sc-val" style="color:var(--blue)">${beatsRate??'—'}</div>
+      <div class="sc-sub">prediction beats DAM price</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Scoring</div>
+      <div class="sc-val" style="font-size:14px;color:var(--amber)">DAM-Relative</div>
+      <div class="sc-sub">|pred−RT| vs |DAM−RT|</div>
+    </div>`;
+  window.observeNewCards?.();
 
+  // Hub accuracy cards
   document.getElementById('hub-grid').innerHTML=APP.HUBS.map(hub=>{
-    const acc=stats.byHub[hub.id];
-    const mae=stats.maeByHub?.[hub.id];
-    const c=pcls(acc??0);
-    const col=acc>=90?'var(--green)':acc>=75?'#86efac':acc>=55?'var(--amber)':'var(--red)';
+    const a=stats.byHub[hub.id];
+    const m=stats.maeByHub?.[hub.id];
+    const col=a>=90?'var(--green)':a>=75?'#6ee7b7':a>=55?'var(--amber)':'var(--red)';
     return`<div class="hcard" style="--hub-color:${hub.color}">
       <div class="hcard-name">${hub.label}<br><span style="color:var(--text-dim);font-size:9px">${hub.city}</span></div>
-      <div class="hcard-acc" style="color:${acc!==undefined?col:'var(--text-dim)'}">${acc!==undefined?acc+'%':'—'}</div>
-      <div class="hcard-mae">${mae!==undefined?'MAE $'+mae.toFixed(2):''}</div>
-      <div class="hcard-bar"><div class="hcard-bar-fill" style="width:${acc??0}%"></div></div>
+      <div class="hcard-acc" style="color:${a!==undefined?col:'var(--text-dim)'}">${a!==undefined?a+'%':'—'}</div>
+      <div class="hcard-mae">${m!==undefined?'MAE $'+m.toFixed(2):''}</div>
+      <div class="hcard-bar"><div class="hcard-bar-fill" style="width:${a??0}%"></div></div>
     </div>`;
   }).join('');
+  window.observeNewCards?.();
 }
 
-// ── Log list ─────────────────────────────────────────────
-let cache={};
+// ── Forecast Log ──────────────────────────────────────────
+let fcCache={};
 
 async function loadLog(){
   const entries=await DB.listEntries({limit:30});
   document.getElementById('s-days').textContent=entries.length||'—';
-  if(!entries.length){document.getElementById('log-list').innerHTML='<div style="padding:14px;color:var(--text-dim);font-size:12px">No entries yet.</div>';return}
+  if(!entries.length){
+    document.getElementById('log-list').innerHTML='<div style="padding:14px;color:var(--text-dim);font-size:12px">No entries yet.</div>';
+    return;
+  }
   document.getElementById('log-list').innerHTML=entries.map(e=>{
+    const src=e._legacy?'legacy':'new';
     const tags=(e.tags||[]).slice(0,2).map(t=>{
       const d=APP.TAGS.find(x=>x.value===t);
       return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11;font-size:9px;padding:1px 5px">${d?.label??t}</span>`;
@@ -312,50 +1119,50 @@ async function loadLog(){
     return`<div class="log-item" id="li-${e.entry_date}" onclick="openEntry('${e.entry_date}')">
       <div class="log-item-date">${APP.fmtDateMed(e.entry_date)}</div>
       <div class="log-item-title">${esc(e.title||'Untitled')}</div>
-      ${tags?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${tags}</div>`:''}
+      ${tags?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${tags}</div>`:''}
+      <div class="log-item-src">${src}</div>
     </div>`;
   }).join('');
-  if(entries.length)openEntry(entries[0].entry_date);
+  if(entries.length) openEntry(entries[0].entry_date);
 }
 
 async function openEntry(date){
   document.querySelectorAll('.log-item').forEach(el=>el.classList.remove('active'));
   document.getElementById(`li-${date}`)?.classList.add('active');
   const det=document.getElementById('log-detail');
-  det.innerHTML='<div style="padding:24px"><div class="skel" style="height:18px;margin-bottom:10px"></div><div class="skel" style="height:60px;margin-bottom:12px"></div><div class="skel" style="height:100px"></div></div>';
+  det.innerHTML='<div style="padding:22px"><div class="skel" style="height:16px;margin-bottom:10px"></div><div class="skel" style="height:56px;margin-bottom:12px"></div><div class="skel" style="height:90px"></div></div>';
   const [entry,forecasts]=await Promise.all([DB.getEntry(date),DB.getForecasts(date)]);
-  cache[date]=forecasts;
-  if(!entry&&!forecasts.length){det.innerHTML='<div class="log-empty">No data for this date</div>';return}
+  fcCache[date]=forecasts;
 
+  // Legacy path
+  if(entry?._legacy && Array.isArray(entry._blocks) && entry._blocks.length){
+    det.innerHTML=renderLegacyEntry(entry);
+    window.panelAnimate?.(det.firstElementChild);
+    return;
+  }
+
+  // New-system path
+  const tags=(entry?.tags||[]).map(t=>{
+    const d=APP.TAGS.find(x=>x.value===t);
+    return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11">${d?.label??t}</span>`;
+  }).join(' ');
   const graded=forecasts.filter(f=>f.actual_energy!==null&&f.pred_energy!==null);
   const scores=graded.map(f=>{
     const pt=(f.pred_energy!=null&&f.pred_congestion!=null)?f.pred_energy+f.pred_congestion:f.pred_energy;
     return APP.accuracy(pt,f.actual_energy,f.dam_price);
   }).filter(s=>s!==null);
   const avgAcc=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
-
-  const tags=(entry?.tags||[]).map(t=>{
-    const d=APP.TAGS.find(x=>x.value===t);
-    return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11">${d?.label??t}</span>`;
-  }).join(' ');
-
   const activeSlot=APP.HOUR_SLOTS.find(s=>forecasts.some(f=>f.hour_slot===s))??APP.HOUR_SLOTS[0];
-
   det.innerHTML=`
     <div class="ld-inner">
-      <div class="ld-date">${APP.fmtDateLong(date)}</div>
+      <div class="ld-date">${APP.fmtDateLong(date)}<span class="ld-src-badge">new</span></div>
       <div class="ld-title">${esc(entry?.title||'Untitled')}</div>
-      ${tags?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${tags}</div>`:''}
-      ${avgAcc!==null?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">${fmtAcc(avgAcc)}<span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${scores.length} forecasts graded</span></div>`:''}
+      ${tags?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tags}</div>`:''}
+      ${avgAcc!==null?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">${fmtAcc(avgAcc)}<span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${scores.length} forecasts graded</span></div>`:''}
       ${entry?.morning_thesis?`<div class="thesis-blk"><div class="thesis-lbl">☀️ Morning Thesis</div><div class="thesis-txt">${esc(entry.morning_thesis)}</div></div>`:''}
       ${entry?.evening_review?`<div class="review-blk"><div class="review-lbl">🌙 Evening Review</div><div class="thesis-txt" style="color:var(--text)">${esc(entry.evening_review)}</div></div>`:''}
-      ${forecasts.length?`
-        <div>
-          <div class="hour-pills" id="hp-${date}"></div>
-          <div class="tbl-wrap" id="pt-${date}"></div>
-        </div>`:''}
+      ${forecasts.length?`<div><div class="hour-pills" id="hp-${date}"></div><div class="tbl-wrap" id="pt-${date}"></div></div>`:''}
     </div>`;
-
   if(forecasts.length){
     renderTable(date,forecasts,activeSlot);
     document.getElementById(`hp-${date}`).innerHTML=
@@ -363,12 +1170,86 @@ async function openEntry(date){
         `<span class="hpill ${s===activeSlot?'active':''}" onclick="sw(this,'${date}',${s})">${APP.fmtHour(s)}</span>`
       ).join('');
   }
+  window.panelAnimate?.(det.firstElementChild);
+}
+
+// Legacy block renderer
+function renderLegacyEntry(entry){
+  const blocks=entry._blocks||[];
+  const sections={};
+  blocks.forEach(b=>{
+    if(!b||!b.value||b.value==='<br>') return;
+    const sec=b.section||'Other';
+    if(!sections[sec]) sections[sec]=[];
+    sections[sec].push(b);
+  });
+  const secOrder=['Setup','Price review','Thesis','Other'];
+  const secLabel={'Setup':'📋 Setup','Price review':'📊 Price Review','Thesis':'🧠 Thesis','Other':'📝 Notes'};
+  let blocksHtml='';
+  for(const sec of secOrder){
+    const blist=sections[sec];
+    if(!blist||!blist.length) continue;
+    blocksHtml+=`<div style="margin-bottom:14px">
+      <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-dim);margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--border)">${secLabel[sec]||sec}</div>
+      ${blist.map(b=>renderLegacyBlock(b)).join('')}
+    </div>`;
+  }
+  return`<div class="ld-inner">
+    <div class="ld-date">${APP.fmtDateLong(entry.entry_date)}<span class="ld-src-badge">legacy</span></div>
+    <div class="ld-title">${esc(entry.title||'Untitled')}</div>
+    ${(entry.tags||[]).map(t=>{const d=APP.TAGS.find(x=>x.value===t);return`<span class="tag-p" style="color:${d?.color??'#888'};border-color:${d?.color??'#888'}33;background:${d?.color??'#888'}11">${d?.label??t}</span>`;}).join(' ')}
+    <div style="margin-top:14px" class="legacy-blocks">${blocksHtml}</div>
+  </div>`;
+}
+
+function renderLegacyBlock(b){
+  const label=b.label?`<span class="lblock-label">${esc(b.label)}</span>`:'';
+  if(b.type==='image'){
+    if(!b.value) return'';
+    return`<div class="lblock" style="margin-bottom:10px">
+      ${b.label?`<div class="lblock-header">${label}</div>`:''}
+      <div class="lblock-img-wrap"><img src="${esc(b.value)}" alt="${esc(b.label||'')}" loading="lazy">
+      ${b.caption?`<div class="lblock-img-caption">${esc(b.caption)}</div>`:''}</div>
+    </div>`;
+  }
+  if(b.type==='link'){
+    return`<div class="lblock" style="margin-bottom:10px">
+      ${b.label?`<div class="lblock-header">${label}</div>`:''}
+      <div class="lblock-body"><a href="${esc(b.value)}" target="_blank" rel="noopener">${esc(b.value)}</a></div>
+    </div>`;
+  }
+  // text — may be rich HTML or structured JSON
+  let displayHtml=b.value||'';
+  if(displayHtml.trim().startsWith('{')){
+    try{
+      const d=JSON.parse(displayHtml);
+      if(d.timeslots){
+        const rows=d.timeslots.map(slot=>{
+          const t=slot.customTime||slot.time||'';
+          if(d.schema==='lambda-v1'){
+            return slot.price?`<div style="font-family:var(--mono);font-size:12px;padding:3px 0"><span style="color:var(--text-dim);min-width:60px;display:inline-block">${esc(t)}</span> <span style="color:var(--amber)">${esc(slot.price)}</span> ${slot.note?`<span style="color:var(--text-dim)"> ${esc(slot.note)}</span>`:''}${slot.rating&&slot.rating!=='unset'?` <span class="ab ab-${slot.rating==='great'?'great':slot.rating==='good'?'good':slot.rating==='meh'?'ok':'poor'}">${esc(slot.rating)}</span>`:''}</div>`:'';
+          } else {
+            const hubRows=Object.entries(slot.hubs||{}).filter(([,h])=>h.price).map(([hub,h])=>
+              `<div style="font-family:var(--mono);font-size:11px;display:flex;gap:12px;padding:2px 0"><span style="color:var(--text-dim);min-width:110px">${esc(hub)}</span><span style="color:var(--blue)">${esc(h.price)}</span>${h.note?`<span style="color:var(--text-dim);font-size:10px"> ${esc(h.note)}</span>`:''}</div>`
+            ).join('');
+            return hubRows?`<div style="padding:6px 0;border-top:1px solid var(--border)"><div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:4px">${esc(t)}</div>${hubRows}</div>`:'';
+          }
+        }).filter(Boolean).join('');
+        displayHtml=rows||'<span style="color:var(--text-dim);font-size:12px">No data entered</span>';
+      }
+    }catch(e){}
+  }
+  if(!displayHtml||displayHtml==='<br>') return'';
+  return`<div class="lblock" style="margin-bottom:10px">
+    ${b.label?`<div class="lblock-header">${label}</div>`:''}
+    <div class="lblock-body">${displayHtml}</div>
+  </div>`;
 }
 
 function sw(pill,date,slot){
   document.querySelectorAll(`#hp-${date} .hpill`).forEach(p=>p.classList.remove('active'));
   pill.classList.add('active');
-  renderTable(date,cache[date]||[],slot);
+  renderTable(date,fcCache[date]||[],slot);
 }
 
 function renderTable(date,forecasts,slot){
@@ -378,8 +1259,7 @@ function renderTable(date,forecasts,slot){
   if(!rows.length){el.innerHTML=`<p style="color:var(--text-dim);font-size:12px">No data for ${APP.fmtHour(slot)}</p>`;return}
   const hasAct=rows.some(f=>f.actual_energy!==null);
   let h=`<table class="pmini"><thead><tr>
-    <th>Hub</th>
-    <th class="num" style="color:var(--blue)">DAM</th>
+    <th>Hub</th><th class="num" style="color:var(--blue)">DAM</th>
     <th class="num" style="color:var(--amber)">λ</th>
     <th class="num" style="color:var(--purple)">Cong</th>
     <th class="num" style="color:var(--amber);font-weight:600">=Total</th>
@@ -400,14 +1280,56 @@ function renderTable(date,forecasts,slot){
       <td class="num" style="font-weight:700">${fmtP(pt)}</td>
       ${hasAct?`<td class="num">${act!==null?fmtP(act):'<span style="color:var(--text-dim)">—</span>'}</td><td class="num">${dEl}</td><td>${fmtAcc(acc)}</td>`:''}
     </tr>`;
-    if(r.pred_notes)h+=`<tr><td colspan="${hasAct?8:5}" style="color:var(--text-dim);font-size:11px;padding:2px 8px 8px;font-style:italic">↳ ${esc(r.pred_notes)}</td></tr>`;
   });
   h+='</tbody></table>';
   el.innerHTML=h;
 }
 
-// ── Boot ─────────────────────────────────────────────────
-Promise.all([loadStats(),loadLog()]);
+// ── Notes & Learning ──────────────────────────────────────
+// DB.listNotes() returns both legacy notes+strategies and new-system notes
+// Each note: { id, title, body (HTML), kind ('note'|'strategy'), created_at, _legacy? }
+let allNotes=[];
+
+async function loadNotes(){
+  allNotes = await DB.listNotes().catch(()=>[]);
+  if(!allNotes.length){
+    document.getElementById('notes-list').innerHTML='<div style="padding:14px;color:var(--text-dim);font-size:12px">No notes yet.</div>';
+    return;
+  }
+  document.getElementById('notes-list').innerHTML=allNotes.map(n=>{
+    const kindCls=n.kind==='strategy'?'kind-strategy':'kind-note';
+    const kindLabel=n.kind==='strategy'?'Strategy':'Note';
+    return`<div class="note-item" id="ni-${n.id}" onclick="openNote('${n.id}')">
+      <div class="note-item-date">${new Date(n.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+      <div class="note-item-title">${esc(n.title||'Untitled')}</div>
+      <span class="note-item-kind ${kindCls}">${kindLabel}</span>
+    </div>`;
+  }).join('');
+  if(allNotes.length) openNote(allNotes[0].id);
+}
+
+function openNote(id){
+  document.querySelectorAll('.note-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`ni-${id}`)?.classList.add('active');
+  const n=allNotes.find(x=>x.id===id);
+  const det=document.getElementById('notes-detail');
+  if(!n){det.innerHTML='<div class="notes-empty">Not found</div>';return}
+  const kindCls=n.kind==='strategy'?'kind-strategy':'kind-note';
+  const kindLabel=n.kind==='strategy'?'Strategy':'Note';
+  det.innerHTML=`<div class="nd-inner">
+    <div class="nd-meta">
+      ${new Date(n.created_at).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}
+      <span class="note-item-kind ${kindCls}">${kindLabel}</span>
+      ${n._legacy?'<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);opacity:.6">legacy</span>':''}
+    </div>
+    <div class="nd-title">${esc(n.title||'Untitled')}</div>
+    <div class="nd-body">${n.body||''}</div>
+  </div>`;
+  window.panelAnimate?.(det.firstElementChild);
+}
+
+// ── Boot ──────────────────────────────────────────────────
+Promise.all([loadStats(), loadLog(), loadNotes()]);
 </script>
 </body>
 </html>
