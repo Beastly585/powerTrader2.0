@@ -88,9 +88,10 @@
     .topnav-pill {
       font-family: var(--mono); font-size: 11px;
       color: var(--text-dim); text-decoration: none;
-      padding: 5px 13px; border: 1px solid var(--border);
-      border-radius: 99px;
+      padding: 5px; border: 1px solid var(--border);
+      border-radius: 5px;
       display: flex; align-items: center; gap: 6px;
+      justify-content: center;
       transition: var(--t); letter-spacing: .02em;
       white-space: nowrap;
     }
@@ -206,6 +207,8 @@
     }
     .bio strong { color: var(--text-hi); font-weight: 500; }
 
+    .bio p {margin-bottom: 12px;}
+
     /* Hero stats — individual cards in a row */
     .hero-stats {
       display: flex; gap: 12px; flex-wrap: wrap;
@@ -235,7 +238,7 @@
     }
 
     /* ── SECTIONS ────────────────────────────────────────── */
-    .section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+    .section { padding: 42px 0; border-bottom: 1px solid var(--border); }
     .section:last-of-type { border-bottom: none; }
     .sec-head { margin-bottom: 40px; }
     .sec-eyebrow {
@@ -567,8 +570,10 @@
       text-transform: uppercase; letter-spacing: .1em;
       color: var(--text-dim); border-bottom: 1px solid var(--border);
       background: var(--bg2);
+      text-align: center;
     }
-    .pmini td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  
+    .pmini td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: center; }
     .pmini tr:last-child td { border-bottom: none; }
     .pmini tr:hover td { background: var(--bg2); }
     .num { text-align: right; }
@@ -719,18 +724,23 @@
     /* Section head fade-up */
     .sec-head.reveal { transform: translateY(16px); }
 
+    .contact-icon {
+      height: 20px;
+      width: auto;
+    }
+
   </style>
 </head>
 <body>
 
 <!-- ── TOP NAV ────────────────────────────────────────────── -->
 <nav class="topnav">
-  <a class="topnav-brand" href="portfolio.html">KM&nbsp;/&nbsp;ERCOT</a>
-  <a class="topnav-pill" href="https://www.linkedin.com/in/kevinmaresca" target="_blank" rel="noopener">
-    <span>💼</span><span class="pill-lbl">LinkedIn</span>
+  <a class="topnav-brand" href="portfolio.html">KM&nbsp;/&nbsp;PTFL</a>
+  <a class="topnav-pill" href="https://www.linkedin.com/in/kevin-maresca-565369251/" target="_blank" rel="noopener">
+    <img src="./LI-Logo.png" class="contact-icon" alt="linked-in-link">
   </a>
   <a class="topnav-pill" href="mailto:kevin.maresca@gmail.com">
-    <span>✉️</span><span class="pill-lbl">Email</span>
+    <img src="./mail.png" class="contact-icon" alt="email-link">
   </a>
   <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
 </nav>
@@ -761,12 +771,12 @@
   <div class="pcont">
     <div class="hero-eye">Independent Research &middot; ERCOT &middot; Texas Power Markets</div>
     <h1 class="hero-h">Day-Ahead LMP<br><em>Forecast Journal</em></h1>
-    <p class="bio">
-      I'm <strong>Kevin Maresca</strong>, a self-taught energy market analyst building toward a career in power trading.
-      I built this journal to develop a rigorous daily practice: every morning I write a market thesis,
-      decompose prices into energy and congestion components across five ERCOT hubs, and track my predictions against settlement.
-      Every evening I write a post-mortem on what I got right and wrong.
-    </p>
+    <div class="bio">
+      <p>I'm <strong>Kevin Maresca</strong>, a self-taught energy market analyst building toward a career in power trading.</p>
+      <p>With a mechanical engineering degree, five years interning for the Dept of Energy, four years of experience power distribution all across the United States, and significant self-study in stock markets (day and swing trading).</p>
+      <p>I built this journal to develop a rigorous daily practice: every day I write a market thesis for the next-day's ERCOT prices at 5 major hubs,
+      decompose prices into energy and congestion components across each hubs, and track my predictions against settlement.</p>
+      </div>
     <div class="hero-stats">
       <div class="hstat">
         <div class="hstat-label">Forecast Days</div>
@@ -811,14 +821,14 @@
         <span class="mbadge-icon">🗺</span>
         <span class="mbadge-label">Coverage</span>
         <div class="mbadge-title">Five ERCOT Hubs</div>
-        <div class="mbadge-body"><code>HB_NORTH</code> Dallas &middot; <code>HB_HOUSTON</code> &middot; <code>HB_SOUTH</code> San Antonio &middot; <code>HB_WEST</code> Midland &middot; <code>HB_PAN</code> Panhandle &mdash; at 4 daily hour slots: 7 AM, 12 PM, 5 PM, 10 PM CPT.</div>
+        <div class="mbadge-body"><code>HB_NORTH</code> Dallas &middot; <code>HB_HOUSTON</code> &middot; <code>HB_SOUTH</code> San Antonio &middot; <code>HB_WEST</code> Midland &middot; <code>HB_PAN</code> Panhandle &mdash; at 3 daily hour slots: 7 AM, 12 PM, and 5 PM CPT.</div>
       </div>
 
       <div class="mbadge reveal" style="--badge-c:var(--amber)">
         <span class="mbadge-icon">☀️</span>
         <span class="mbadge-label">Process</span>
-        <div class="mbadge-title">Morning Thesis First</div>
-        <div class="mbadge-body">Wind generation outlook, demand forecast, temperature drivers, and known transmission outages are documented before any prices are entered. Reasoning lives separately from the numbers.</div>
+        <div class="mbadge-title">Day-Ahead Thesis</div>
+        <div class="mbadge-body">Demand forecast, wind & solar predicted generation based on weather forecasts, temperature drivers, and known transmission outages are documented before any prices are entered. Reasoning lives separately from the numbers.</div>
       </div>
 
       <div class="mbadge reveal-r" style="--badge-c:var(--purple)">
@@ -832,14 +842,14 @@
         <span class="mbadge-icon">📐</span>
         <span class="mbadge-label">Scoring</span>
         <div class="mbadge-title">DAM-Relative Accuracy</div>
-        <div class="mbadge-body">Score = 60% delta-based (anchored at $50/MWh) + 40% vs-DAM. Beating the DAM earns a bonus. The benchmark isn't perfection — it's whether I'm adding signal beyond what the market already priced in.</div>
+        <div class="mbadge-body">Score = 60% delta-based + 40% vs-DAM. Beating the DAM earns a bonus. The goal is to determine whether I'm adding signal beyond what the market already priced.</div>
       </div>
 
       <div class="mbadge reveal-r" style="--badge-c:var(--green)">
         <span class="mbadge-icon">🌙</span>
         <span class="mbadge-label">Review</span>
         <div class="mbadge-title">Evening Post-Mortem</div>
-        <div class="mbadge-body">After RT settles, each day gets a written review: what drove the market, where the thesis was right or wrong, and what would have changed the call. Congestion accuracy is tracked separately from energy.</div>
+        <div class="mbadge-body">After RT settles, each day gets a review: what drove the market, where the thesis was right or wrong, and what would have changed the call.</div>
       </div>
 
     </div>
